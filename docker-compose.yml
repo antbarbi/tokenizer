@@ -1,0 +1,7 @@
+services:
+  solana:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # volumes:
+    #   -
