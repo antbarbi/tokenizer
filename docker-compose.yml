@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - $HOME/.zshrc:/root/.zshrc
+      - $PWD:/root/home/
     tty: true
     stdin_open: true
     restart: unless-stopped

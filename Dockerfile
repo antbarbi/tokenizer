@@ -45,7 +45,7 @@ RUN solana --version
 RUN solana config set -ud
 
 # Set working directory
-WORKDIR /solana-token
+WORKDIR /root
 
 # Use zsh as the default shell
 CMD ["/bin/zsh"]
