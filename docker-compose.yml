@@ -3,5 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # volumes:
-    #   -
+    volumes:
+      - $HOME/.zshrc:/root/.zshrc
+    tty: true
+    stdin_open: true
+    restart: unless-stopped

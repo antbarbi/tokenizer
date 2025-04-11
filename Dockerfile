@@ -25,8 +25,24 @@ RUN chsh -s /bin/zsh root
 # Add Rust to PATH
 ENV PATH="/root/.cargo/bin:$PATH"
 
+# Verify Rust installation
+RUN rustc --version
+
 # Rest of your existing Dockerfile...
 ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
+
+# Install Solana CLI
+RUN curl -sSfL https://release.anza.xyz/stable/install | sh \
+    && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"'
+
+# Add Solana CLI to PATH
+ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
+
+# Verify Solana CLI installation
+RUN solana --version
+
+# Set up Solana config for Devnet
+RUN solana config set -ud
 
 # Set working directory
 WORKDIR /solana-token
