@@ -44,6 +44,12 @@ RUN solana --version
 # Set up Solana config for Devnet
 RUN solana config set -ud
 
+RUN cargo install --git https://github.com/coral-xyz/anchor avm --force
+
+RUN avm use latest
+
+RUN cargo install seahorse-dev
+
 # Set working directory
 WORKDIR /root
 
