@@ -44,10 +44,18 @@ RUN solana --version
 # Set up Solana config for Devnet
 RUN solana config set -ud
 
+# Install Node.js and Yarn
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g yarn
+
+# Install anchor version manager
 RUN cargo install --git https://github.com/coral-xyz/anchor avm --force
 
-RUN avm use latest
+# Set 0.28.0, latest version does not work with seahorse 2.0 atm
+RUN echo "y" | avm use 0.28.0
 
+# Install seahorse-dev
 RUN cargo install seahorse-dev
 
 # Set working directory
