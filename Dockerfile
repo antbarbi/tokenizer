@@ -33,33 +33,43 @@ ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
 
 # Install Solana CLI
 RUN curl -sSfL https://release.anza.xyz/stable/install | sh \
-    && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"'
+    && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> ~/.zshrc
 
-# Add Solana CLI to PATH
-ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
+COPY ./id.json /root
 
-# Verify Solana CLI installation
-RUN solana --version
+RUN solana config set --url localhost --keypair /root/id.json
 
-# Set up Solana config for Devnet
-RUN solana config set -ud
+# # Install Solana CLI
+# RUN sh -c "$(curl -sSfL https://release.solana.com/v1.17.0/install)" \
+#     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"'
 
-# Install Node.js and Yarn
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g yarn
+# # Add Solana CLI to PATH
+# ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
 
-# Install anchor version manager
-RUN cargo install --git https://github.com/coral-xyz/anchor avm --force
+# # Verify Solana CLI installation
+# RUN solana --version
 
-# Set 0.28.0, latest version does not work with seahorse 2.0 atm
-RUN echo "y" | avm use 0.28.0
+# # Set up Solana config for Devnet
+# RUN solana config set -ud
 
-# Install seahorse-dev
-RUN cargo install seahorse-dev
+# # Install Node.js and Yarn
+# RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+#     && apt-get install -y nodejs \
+#     && npm install -g yarn
 
-# Set working directory
-WORKDIR /root
+# # Install anchor version manager
+# RUN cargo install --git https://github.com/coral-xyz/anchor avm --force
 
+# # Set 0.28.0, latest version does not work with seahorse 2.0 atm
+# RUN echo "y" | avm use 0.29.0
+
+# # Install seahorse-dev
+# RUN cargo install seahorse-dev
+
+# # Set working directory
+# WORKDIR /root
+
+
+# CMD ["/bin/zsh"]
 # Use zsh as the default shell
-CMD ["/bin/zsh"]
+CMD ["solana-test-validator"]
