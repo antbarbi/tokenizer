@@ -35,9 +35,11 @@ ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
 RUN curl -sSfL https://release.anza.xyz/stable/install | sh \
     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> ~/.zshrc
 
-COPY ./id.json /root
+# COPY ./id.json /root
 
-RUN solana config set --url localhost --keypair /root/id.json
+RUN solana-keygen new  --no-bip39-passphrase
+
+RUN solana config set --url localhost --keypair /root/.config/solana/id.json
 
 # # Install Solana CLI
 # RUN sh -c "$(curl -sSfL https://release.solana.com/v1.17.0/install)" \
