@@ -65,3 +65,43 @@ def use_token_mint(
     holder = recipient,
     amount = 99 * 1_000_000
   )
+
+class Multisig(Account):
+    signers: [Pubkey; 5]  # Up to 5 authorized signers
+    threshold: u8         # Number of required signatures
+
+@instruction
+def use_token_mint_multisig(
+    multisig: Multisig,
+    mint: TokenMint,
+    recipient: TokenAccount,
+    signer1: Signer,
+    signer2: Signer,
+    # Add more signers as needed
+    recipient_signer: Signer
+):
+    # Collect all provided signers
+    provided_signers = [signer1.key(), signer2.key()]  # Add more as needed
+
+    # Count how many provided signers are in the multisig's authorized list
+    valid_signers = 0
+    for s in provided_signers:
+        for auth in multisig.signers:
+            if s == auth:
+                valid_signers += 1
+                break
+
+    # Check if threshold is met
+    assert valid_signers >= multisig.threshold, "Not enough multisig approvals"
+
+    # Proceed with mint and burn as before
+    mint.mint(
+        authority = signer1,  # or any of the valid signers
+        to = recipient,
+        amount = 100 * 1_000_000
+    )
+    mint.burn(
+        authority = recipient_signer,
+        holder = recipient,
+        amount = 99 * 1_000_000
+    )
