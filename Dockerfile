@@ -41,6 +41,8 @@ RUN solana-keygen new  --no-bip39-passphrase
 
 RUN solana config set --url localhost --keypair /root/.config/solana/id.json
 
+COPY ./entrypoint.sh /entrypoint.sh
+
 # # Install Solana CLI
 # RUN sh -c "$(curl -sSfL https://release.solana.com/v1.17.0/install)" \
 #     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"'
@@ -74,4 +76,4 @@ RUN solana config set --url localhost --keypair /root/.config/solana/id.json
 
 # CMD ["/bin/zsh"]
 # Use zsh as the default shell
-CMD ["solana-test-validator"]
+CMD ["/entrypoint.sh"]

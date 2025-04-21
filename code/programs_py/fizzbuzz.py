@@ -5,7 +5,7 @@
 
 from seahorse.prelude import *
 
-declare_id('8k8YvtXV17HHc4EVpRa6P2A29w2FunZYNhTdtDqRujnN')
+declare_id('4zBjDvXgzLAM1GQbMye8baUtTES3qx6MRFpgodg3Laea')
 
 class Multisig(Account):
     signer1: Pubkey
@@ -35,6 +35,7 @@ def init(
     threshold: u8,
     payer: Signer
 ):
+    # Get bump BEFORE initialization (method call is valid)
     bump = multisig.bump()
 
     multisig = multisig.init(
@@ -52,7 +53,7 @@ def init(
     multisig.signer1 = signer1
     multisig.signer2 = signer2
     multisig.threshold = threshold
-    multisig.bump = bump
+    multisig.bump = bump  # Store the bump as a field
 
 @instruction
 def init_token_account(

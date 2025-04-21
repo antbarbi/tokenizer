@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - $HOME/.zshrc:/root/.zshrc
       - $PWD:/root/home/
     ports:
       - "8899:8899"
