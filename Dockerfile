@@ -35,45 +35,17 @@ ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
 RUN curl -sSfL https://release.anza.xyz/stable/install | sh \
     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> ~/.zshrc
 
-# COPY ./id.json /root
+# Create a directory for Solana program binaries
+RUN mkdir -p /root/program-bins
+
+# Download Metaplex Token Metadata program
+RUN curl -L https://github.com/metaplex-foundation/metaplex-program-library/releases/download/v1.11.1/mpl_token_metadata.so -o /root/program-bins/mpl_token_metadata.so
 
 RUN solana-keygen new  --no-bip39-passphrase
 
 RUN solana config set --url localhost --keypair /root/.config/solana/id.json
 
 COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# # Install Solana CLI
-# RUN sh -c "$(curl -sSfL https://release.solana.com/v1.17.0/install)" \
-#     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"'
-
-# # Add Solana CLI to PATH
-# ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
-
-# # Verify Solana CLI installation
-# RUN solana --version
-
-# # Set up Solana config for Devnet
-# RUN solana config set -ud
-
-# # Install Node.js and Yarn
-# RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-#     && apt-get install -y nodejs \
-#     && npm install -g yarn
-
-# # Install anchor version manager
-# RUN cargo install --git https://github.com/coral-xyz/anchor avm --force
-
-# # Set 0.28.0, latest version does not work with seahorse 2.0 atm
-# RUN echo "y" | avm use 0.29.0
-
-# # Install seahorse-dev
-# RUN cargo install seahorse-dev
-
-# # Set working directory
-# WORKDIR /root
-
-
-# CMD ["/bin/zsh"]
-# Use zsh as the default shell
 CMD ["/entrypoint.sh"]
