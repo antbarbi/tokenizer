@@ -1,12 +1,12 @@
 [package]
-name = "fizzbuzz"
+name = "token-program"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "fizzbuzz"
+name = "token_program"
 
 [features]
 no-entrypoint = []
@@ -17,5 +17,4 @@ default = []
 
 [dependencies]
 anchor-lang = "0.29.0"
-anchor-spl = "*"
-pyth-sdk-solana = { version = "*", optional = true }
+anchor-spl = "0.29.0"

@@ -1,11 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import * as web3 from "@solana/web3.js";
-import type { Fizzbuzz } from "../target/types/fizzbuzz";
+import type { TokenProgram } from "../target/types/token_program";
 
 // Configure the client to use the local cluster
 anchor.setProvider(anchor.AnchorProvider.env());
 
-const program = anchor.workspace.Fizzbuzz as anchor.Program<Fizzbuzz>;
+const program = anchor.workspace.TokenProgram as anchor.Program<TokenProgram>;
 
 // Client
 console.log("My address:", program.provider.publicKey.toString());

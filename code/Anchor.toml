@@ -3,7 +3,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-fizzbuzz = "4zBjDvXgzLAM1GQbMye8baUtTES3qx6MRFpgodg3Laea"
+token_program = "3XMAcnx68dL7FDrwhRaTfC96oqN3we1AhynqpTMLxLqe"
 
 [registry]
 url = "https://api.apr.dev"
