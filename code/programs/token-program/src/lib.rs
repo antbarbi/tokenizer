@@ -7,7 +7,7 @@ use anchor_spl::metadata::{
     Metadata,
 };
 
-declare_id!("3XMAcnx68dL7FDrwhRaTfC96oqN3we1AhynqpTMLxLqe");
+declare_id!("8habFRuakcsNxRugQiTs77jxfug2mTSaWY6WJTooiuGt");
 
 #[program]
 mod token_program {
@@ -36,6 +36,29 @@ mod token_program {
         token::mint_to(cpi_ctx, amount)?;
         
         msg!("Minted {} tokens to {}", amount, ctx.accounts.token_account.key());
+        Ok(())
+    }
+
+    pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
+        // Create the transfer CPI instruction
+        let cpi_accounts = token::Transfer {
+            from: ctx.accounts.source.to_account_info(),
+            to: ctx.accounts.destination.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        };
+
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+
+        // Execute transfer
+        token::transfer(cpi_ctx, amount)?;
+
+        msg!("Transferred {} tokens from {} to {}", 
+            amount, 
+            ctx.accounts.source.key(), 
+            ctx.accounts.destination.key()
+        );
+
         Ok(())
     }
 }
@@ -95,5 +118,20 @@ pub struct MintTokens<'info> {
     pub token_account: Account<'info, TokenAccount>,
     
     pub mint_authority: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct TransferTokens<'info> {
+    #[account(
+        mut,
+        token::authority = authority,
+    )]
+    pub source: Account<'info, TokenAccount>,
+    
+    #[account(mut)]
+    pub destination: Account<'info, TokenAccount>,
+    
+    pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
