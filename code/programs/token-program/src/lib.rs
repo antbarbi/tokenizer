@@ -46,19 +46,19 @@ mod token_program {
             to: ctx.accounts.destination.to_account_info(),
             authority: ctx.accounts.authority.to_account_info(),
         };
-
+        
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
+        
         // Execute transfer
         token::transfer(cpi_ctx, amount)?;
-
+        
         msg!("Transferred {} tokens from {} to {}", 
             amount, 
             ctx.accounts.source.key(), 
             ctx.accounts.destination.key()
         );
-
+        
         Ok(())
     }
 }
@@ -129,7 +129,11 @@ pub struct TransferTokens<'info> {
     )]
     pub source: Account<'info, TokenAccount>,
     
-    #[account(mut)]
+    #[account(
+        mut,
+        // Add this constraint to verify destination is for the correct mint
+        token::mint = source.mint,
+    )]
     pub destination: Account<'info, TokenAccount>,
     
     pub authority: Signer<'info>,
