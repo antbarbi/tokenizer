@@ -8,16 +8,18 @@ async function main() {
   anchor.setProvider(provider);
   
   // Your program ID from declare_id!()
-  const programId = new PublicKey("8habFRuakcsNxRugQiTs77jxfug2mTSaWY6WJTooiuGt");
+  // const programId = new PublicKey("FaHQQcpF2YyJ8LBjJ2svXcNRRgWeAgy9LLk1fzHvTXza");
+  const programId = pg.PROGRAM_ID
   const program = anchor.workspace.TokenProgram;
-  
+
   const wallet = provider.wallet;
   console.log("Main wallet public key:", wallet.publicKey.toString());
   
   // Create a second wallet to demonstrate transfers
-  const secondWallet = Keypair.generate();
+  const secondWalletSeed = new Uint8Array(32).fill(1); // Simple seed for testing
+  const secondWallet = Keypair.fromSeed(secondWalletSeed);
   console.log("Second wallet public key:", secondWallet.publicKey.toString());
-  
+
   try {
     const accountExists = async (pubkey) => {
       try {
@@ -127,7 +129,24 @@ async function main() {
       console.log("Second token account already exists, skipping creation");
     }
 
-    
+    // Fetch token account information BEFORE displaying balances
+    let tokenAccount1 = await getAccount(
+      provider.connection, 
+      tokenAccount1PDA,
+      'confirmed'
+    );
+    let tokenAccount2 = await getAccount(
+      provider.connection, 
+      tokenAccount2PDA,
+      'confirmed'
+    );
+
+    console.log("First token account balance:", 
+      tokenAccount1.amount.toString() / Math.pow(10, 9), "tokens");
+    console.log("Second token account balance:", 
+      tokenAccount2.amount.toString() / Math.pow(10, 9), "tokens");
+
+
     // 7. MINT TOKENS TO FIRST ACCOUNT
     const mintAmount = new anchor.BN(1000000000); // 1 token with 9 decimals
     console.log("Minting tokens to first account...");
@@ -140,29 +159,67 @@ async function main() {
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
-    
+
+    tokenAccount1 = await getAccount(
+      provider.connection, 
+      tokenAccount1PDA,
+      'confirmed'
+    );
+    tokenAccount2 = await getAccount(
+      provider.connection, 
+      tokenAccount2PDA,
+      'confirmed'
+    );
+
+    console.log("First token account balance:", 
+      tokenAccount1.amount.toString() / Math.pow(10, 9), "tokens");
+    console.log("Second token account balance:", 
+      tokenAccount2.amount.toString() / Math.pow(10, 9), "tokens");
+
     // 8. TRANSFER TOKENS FROM FIRST TO SECOND ACCOUNT
-    const transferAmount = new anchor.BN(500000000); // 0.5 tokens
-    console.log("Transferring tokens from first to second account...");
-    await program.methods
-      .transferTokens(transferAmount)
-      .accounts({
-        source: tokenAccount1PDA,
-        destination: tokenAccount2PDA,
-        authority: wallet.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .rpc();
-    
-    console.log("All token operations completed successfully!");
+    try {
+      const transferAmount = new anchor.BN(500000000); // 0.5 tokens
+      console.log("Transferring tokens from first to second account...");
+      const tx = await program.methods
+        .transferTokens(transferAmount)
+        .accounts({
+          source: tokenAccount1PDA,
+          destination: tokenAccount2PDA,
+          authority: wallet.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc({ commitment: 'confirmed' });
+      console.log("Transfer transaction signature:", tx);
+      
+      // Wait a moment for the transaction to be fully processed
+      const latestBlockhash = await provider.connection.getLatestBlockhash();
+      await provider.connection.confirmTransaction({
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        signature: tx
+      });
+      
+    } catch (error) {
+      console.error("Transfer failed with error:", error);
+    }
     
     // 9. DISPLAY TOKEN BALANCES
-    const tokenAccount1 = await getAccount(provider.connection, tokenAccount1PDA);
-    const tokenAccount2 = await getAccount(provider.connection, tokenAccount2PDA);
-    
-    console.log(`First account balance: ${tokenAccount1.amount / BigInt(1000000000)} tokens`);
-    console.log(`Second account balance: ${tokenAccount2.amount / BigInt(1000000000)} tokens`);
-    
+    tokenAccount1 = await getAccount(
+      provider.connection, 
+      tokenAccount1PDA,
+      'confirmed'
+    );
+    tokenAccount2 = await getAccount(
+      provider.connection, 
+      tokenAccount2PDA,
+      'confirmed'
+    );
+
+    console.log("First token account balance:", 
+      tokenAccount1.amount.toString() / Math.pow(10, 9), "tokens");
+    console.log("Second token account balance:", 
+      tokenAccount2.amount.toString() / Math.pow(10, 9), "tokens");
+
   } catch (error) {
     console.error("Error:", error);
   }
