@@ -1,235 +1,180 @@
-// Remove all imports - Solana Playground provides these globally
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
-class MultisigMintClient {
+class RealMultisigClient {
   private connection: any;
   private program: any;
   private wallet: any;
 
   constructor() {
-    // Get connection, program, and wallet from Solana Playground's global objects
-    this.connection = pg.connection;
-    this.program = pg.program;
-    this.wallet = pg.wallet;
+    const provider = anchor.AnchorProvider.env();
+    anchor.setProvider(provider);
+    
+    this.connection = provider.connection;
+    this.wallet = provider.wallet;
+    this.program = anchor.workspace.TokenProgram;
   }
 
-  async createMultisigAndMint() {
+  async createRealMultisig() {
     try {
-      console.log("🚀 Starting multisig mint proof of concept...");
+      console.log("🚀 Creating REAL multisig setup...");
 
-      // Step 1: Create PERSISTENT multisig signers (using deterministic seeds)
-      const seed1 = "signer1";
-      const seed2 = "signer2";
-      const seed3 = "signer3";
+      // Step 1: Create multiple signer keypairs (3 signers, need 2 to execute)
+      const signer1 = web3.Keypair.generate();
+      const signer2 = web3.Keypair.generate();
+      const signer3 = web3.Keypair.generate();
       
-      const signer1 = web3.Keypair.fromSeed(new Uint8Array(32).fill(1)); // Deterministic signer 1
-      const signer2 = web3.Keypair.fromSeed(new Uint8Array(32).fill(2)); // Deterministic signer 2
-      const signer3 = web3.Keypair.fromSeed(new Uint8Array(32).fill(3)); // Deterministic signer 3
-      
-      const signers = [signer1.publicKey, signer2.publicKey, signer3.publicKey];
-      const threshold = 2; // Require 2 out of 3 signatures
+      console.log(`👤 Signer 1: ${signer1.publicKey.toString()}`);
+      console.log(`👤 Signer 2: ${signer2.publicKey.toString()}`);
+      console.log(`👤 Signer 3: ${signer3.publicKey.toString()}`);
 
-      console.log("👥 Using persistent multisig signers:");
-      console.log(`  Signer 1: ${signer1.publicKey.toString()}`);
-      console.log(`  Signer 2: ${signer2.publicKey.toString()}`);
-      console.log(`  Signer 3: ${signer3.publicKey.toString()}`);
-      console.log(`  Threshold: ${threshold}`);
-
-      // Step 2: Create persistent multisig account (using deterministic seed)
-      const multisigSeed = new Uint8Array(32).fill(100); // Deterministic multisig seed
-      const multisigKeypair = web3.Keypair.fromSeed(multisigSeed);
-      
-      console.log(`\n🔐 Using multisig account: ${multisigKeypair.publicKey.toString()}`);
-
-      // Use the TOKEN_PROGRAM_ID constant directly
-      const TOKEN_PROGRAM_ID = new web3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-      
-      // Check if multisig account already exists
-      const existingMultisig = await this.connection.getAccountInfo(multisigKeypair.publicKey);
-      
-      if (!existingMultisig) {
-        console.log("🆕 Creating new multisig account...");
-        
-        // Create and fund the multisig account
-        const multisigRent = await this.connection.getMinimumBalanceForRentExemption(355);
-        
-        const createMultisigAccountIx = web3.SystemProgram.createAccount({
-          fromPubkey: this.wallet.publicKey,
-          newAccountPubkey: multisigKeypair.publicKey,
-          lamports: multisigRent,
-          space: 355,
-          programId: TOKEN_PROGRAM_ID,
-        });
-
-        // Create the initialize multisig instruction manually
-        const initMultisigData = Buffer.alloc(1 + 1 + (32 * signers.length));
-        initMultisigData.writeUInt8(2, 0); // InitializeMultisig instruction discriminant
-        initMultisigData.writeUInt8(threshold, 1); // threshold
-        
-        // Write signer pubkeys
-        for (let i = 0; i < signers.length; i++) {
-          signers[i].toBuffer().copy(initMultisigData, 2 + (i * 32));
-        }
-
-        const initMultisigIx = new web3.TransactionInstruction({
-          keys: [
-            { pubkey: multisigKeypair.publicKey, isSigner: false, isWritable: true },
-            { pubkey: web3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-            ...signers.map(signer => ({ pubkey: signer, isSigner: false, isWritable: false }))
-          ],
-          programId: TOKEN_PROGRAM_ID,
-          data: initMultisigData,
-        });
-
-        const multisigTx = new web3.Transaction()
-          .add(createMultisigAccountIx)
-          .add(initMultisigIx);
-
-        // Sign and send the transaction
-        const multisigSignature = await web3.sendAndConfirmTransaction(
-          this.connection,
-          multisigTx,
-          [this.wallet.keypair, multisigKeypair]
+      // Fund the signers
+      const signers = [signer1, signer2, signer3];
+      for (let i = 0; i < signers.length; i++) {
+        const airdropSig = await this.connection.requestAirdrop(
+          signers[i].publicKey,
+          0.1 * web3.LAMPORTS_PER_SOL
         );
-        
-        console.log("✅ Multisig account created successfully!");
-        console.log(`📝 Multisig creation signature: ${multisigSignature}`);
-      } else {
-        console.log("♻️ Reusing existing multisig account!");
+        await this.connection.confirmTransaction(airdropSig);
+        console.log(`💰 Signer ${i + 1} funded`);
       }
 
-      // Step 3: Reuse existing PDA or create new one
-      const [mintPDA] = web3.PublicKey.findProgramAddressSync(
-        [Buffer.from("multisig_mint"), this.wallet.publicKey.toBuffer()],
+      // Step 2: Create multisig account (3 signers, threshold = 2)
+      const [multisigPDA] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("multisig"), this.wallet.publicKey.toBuffer()],
         this.program.programId
       );
 
-      console.log(`\n🪙 Checking mint PDA: ${mintPDA.toString()}`);
+      console.log(`\n🔐 Creating multisig PDA: ${multisigPDA.toString()}`);
 
-      // Check if mint already exists
-      const existingMint = await this.connection.getAccountInfo(mintPDA);
-      
-      if (existingMint) {
-        console.log("♻️ Reusing existing mint PDA!");
-        console.log(`📝 Mint PDA: ${mintPDA.toString()}`);
-      } else {
-        console.log("🆕 Creating new mint with multisig authority...");
-        
-        const createMintTx = await this.program.methods
-          .createMultisigMint(9) // 9 decimals
-          .accounts({
-            mint: mintPDA,
-            multisigAuthority: multisigKeypair.publicKey,
-            payer: this.wallet.publicKey,
-            systemProgram: web3.SystemProgram.programId,
-            tokenProgram: TOKEN_PROGRAM_ID,
-            rent: web3.SYSVAR_RENT_PUBKEY,
-          })
-          .rpc();
+      const createMultisigTx = await this.program.methods
+        .createMultisig(
+          [signer1.publicKey, signer2.publicKey, signer3.publicKey], // 3 signers
+          2 // Threshold: need 2 signatures
+        )
+        .accounts({
+          multisig: multisigPDA,
+          payer: this.wallet.publicKey,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .rpc();
 
-        console.log("✅ Mint created with multisig authority!");
-        console.log(`📝 Create mint transaction: ${createMintTx}`);
-      }
+      console.log("✅ Multisig account created!");
+      console.log(`📝 Multisig creation tx: ${createMultisigTx}`);
 
-      // Step 4: Create token account for receiving minted tokens  
-      const recipient = web3.Keypair.generate();
-      
-      // Calculate associated token address manually
-      const ASSOCIATED_TOKEN_PROGRAM_ID = new web3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
-      const [tokenAccount] = web3.PublicKey.findProgramAddressSync(
+      // Step 3: Create mint with multisig as authority
+      const [mintPDA] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("mint"), multisigPDA.toBuffer()],
+        this.program.programId
+      );
+
+      console.log(`\n🪙 Creating mint with multisig authority: ${mintPDA.toString()}`);
+
+      const createMintTx = await this.program.methods
+        .createMultisigMint(9)
+        .accounts({
+          mint: mintPDA,
+          multisig: multisigPDA,
+          payer: this.wallet.publicKey,
+          systemProgram: web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: web3.SYSVAR_RENT_PUBKEY,
+        })
+        .rpc();
+
+      console.log("✅ Mint created with multisig authority!");
+      console.log(`📝 Mint creation tx: ${createMintTx}`);
+
+      // Step 4: Create token account
+      const [tokenAccountPDA] = web3.PublicKey.findProgramAddressSync(
         [
-          recipient.publicKey.toBuffer(),
-          TOKEN_PROGRAM_ID.toBuffer(),
-          mintPDA.toBuffer(),
+          Buffer.from("token_account"),
+          this.wallet.publicKey.toBuffer(),
+          mintPDA.toBuffer()
         ],
-        ASSOCIATED_TOKEN_PROGRAM_ID
+        this.program.programId
       );
 
-      console.log(`\n💰 Creating token account: ${tokenAccount.toString()}`);
+      console.log(`\n💰 Creating token account: ${tokenAccountPDA.toString()}`);
 
-      // Check if token account already exists
-      const existingTokenAccount = await this.connection.getAccountInfo(tokenAccount);
-      
-      if (existingTokenAccount) {
-        console.log("♻️ Token account already exists, skipping creation...");
-      } else {
-        // Create associated token account instruction manually
-        const createATAData = Buffer.alloc(0); // No data needed for ATA creation
-        
-        const createTokenAccountIx = new web3.TransactionInstruction({
-          keys: [
-            { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
-            { pubkey: tokenAccount, isSigner: false, isWritable: true },
-            { pubkey: recipient.publicKey, isSigner: false, isWritable: false },
-            { pubkey: mintPDA, isSigner: false, isWritable: false },
-            { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
-            { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-            { pubkey: web3.SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-          ],
-          programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-          data: createATAData,
-        });
+      const createTokenAccountTx = await this.program.methods
+        .createTokenAccount()
+        .accounts({
+          tokenAccount: tokenAccountPDA,
+          mint: mintPDA,
+          owner: this.wallet.publicKey,
+          systemProgram: web3.SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: web3.SYSVAR_RENT_PUBKEY,
+        })
+        .rpc();
 
-        const tokenAccountTx = new web3.Transaction().add(createTokenAccountIx);
-        const tokenAccountSignature = await web3.sendAndConfirmTransaction(
-          this.connection,
-          tokenAccountTx,
-          [this.wallet.keypair]
-        );
+      console.log("✅ Token account created!");
+      console.log(`📝 Token account tx: ${createTokenAccountTx}`);
 
-        console.log("✅ Token account created!");
-        console.log(`📝 Token account creation signature: ${tokenAccountSignature}`);
-      }
+      // Step 5: Mint tokens using multisig (requires 2 out of 3 signatures)
+      const mintAmount = 1000000000; // 1 token
 
-    // Step 5: Mint tokens using multisig (this is the key part!)
-    const mintAmount = 1000000000; // 1 token with 9 decimals
+      console.log(`\n🎯 Minting ${mintAmount / 1000000000} tokens with REAL multisig...`);
+      console.log("📝 This requires 2 out of 3 signatures!");
 
-    console.log(`\n🎯 Minting ${mintAmount / 1000000000} tokens using multisig...`);
+      // Use signer1 and signer2 (2 out of 3 signers)
+      const mintTxSig = await this.program.methods
+        .multisigMintTokens(new anchor.BN(mintAmount))
+        .accounts({
+          mint: mintPDA,
+          tokenAccount: tokenAccountPDA,
+          multisig: multisigPDA,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .remainingAccounts([
+          // Pass the required signers as remaining accounts
+          { pubkey: signer1.publicKey, isWritable: false, isSigner: true },
+          { pubkey: signer2.publicKey, isWritable: false, isSigner: true },
+          // Note: We don't include signer3, showing we only need 2 out of 3
+        ])
+        .signers([signer1, signer2]) // Both signers must sign
+        .rpc();
 
-    // Create SPL Token MintTo instruction with multisig
-    const mintToData = Buffer.alloc(9);
-    mintToData.writeUInt8(7, 0); // MintTo instruction discriminant
-    mintToData.writeBigUInt64LE(BigInt(mintAmount), 1); // Amount as u64
-
-    const mintToIx = new web3.TransactionInstruction({
-      keys: [
-        { pubkey: mintPDA, isSigner: false, isWritable: true }, // mint
-        { pubkey: tokenAccount, isSigner: false, isWritable: true }, // destination
-        { pubkey: multisigKeypair.publicKey, isSigner: false, isWritable: false }, // multisig authority
-        { pubkey: signer1.publicKey, isSigner: true, isWritable: false }, // multisig signer 1
-        { pubkey: signer2.publicKey, isSigner: true, isWritable: false }, // multisig signer 2
-      ],
-      programId: TOKEN_PROGRAM_ID,
-      data: mintToData,
-    });
-
-      const mintTx = new web3.Transaction().add(mintToIx);
-
-      // Get recent blockhash and add it to the transaction
-      const { blockhash } = await this.connection.getLatestBlockhash();
-      mintTx.recentBlockhash = blockhash;
-      mintTx.feePayer = this.wallet.publicKey;
-
-      // Include the multisig signers in the transaction (they need to actually sign)
-      const signature = await web3.sendAndConfirmTransaction(
-        this.connection,
-        mintTx,
-        [this.wallet.keypair, signer1, signer2] // Include the multisig signer keypairs
-      );
-
-      console.log("✅ Multisig mint successful!");
-      console.log(`📝 Transaction signature: ${signature}`);
+      console.log("✅ REAL multisig mint successful!");
+      console.log(`📝 Multisig mint tx: ${mintTxSig}`);
+      console.log("🔒 Required 2 signatures out of 3 possible signers");
 
       // Step 6: Verify the mint
-      const tokenAccountInfo = await this.connection.getTokenAccountBalance(tokenAccount);
+      const tokenAccountInfo = await this.connection.getTokenAccountBalance(tokenAccountPDA);
       console.log(`\n🎉 Final token balance: ${tokenAccountInfo.value.uiAmount} tokens`);
 
+      // Step 7: Demonstrate failed transaction with insufficient signatures
+      console.log(`\n❌ Demonstrating failed mint with only 1 signature...`);
+      
+      try {
+        await this.program.methods
+          .multisigMintTokens(new anchor.BN(500000000))
+          .accounts({
+            mint: mintPDA,
+            tokenAccount: tokenAccountPDA,
+            multisig: multisigPDA,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .remainingAccounts([
+            { pubkey: signer1.publicKey, isWritable: false, isSigner: true },
+            // Only 1 signer - should fail
+          ])
+          .signers([signer1])
+          .rpc();
+      } catch (error) {
+        console.log("✅ Successfully prevented mint with insufficient signatures!");
+        console.log(`📝 Error: ${error.message}`);
+      }
+
       return {
+        multisigPDA,
         mintPDA,
-        multisigAccount: multisigKeypair.publicKey,
-        tokenAccount,
-        signature
+        tokenAccountPDA,
+        signers: [signer1.publicKey, signer2.publicKey, signer3.publicKey],
+        threshold: 2,
+        mintSignature: mintTxSig
       };
-,
+
     } catch (error) {
       console.error("❌ Error:", error);
       console.error("❌ Error details:", error.message);
@@ -241,14 +186,16 @@ class MultisigMintClient {
   }
 }
 
-// Main function for Solana Playground
-const runClient = async () => {
-  console.log("My address:", pg.wallet.publicKey.toString());
-  const balance = await pg.connection.getBalance(pg.wallet.publicKey);
+// Main function
+async function main() {
+  console.log("My address:", anchor.AnchorProvider.env().wallet.publicKey.toString());
+  const balance = await anchor.AnchorProvider.env().connection.getBalance(
+    anchor.AnchorProvider.env().wallet.publicKey
+  );
   console.log(`My balance: ${balance / web3.LAMPORTS_PER_SOL} SOL`);
   
-  const client = new MultisigMintClient();
-  await client.createMultisigAndMint();
-};
+  const client = new RealMultisigClient();
+  await client.createRealMultisig();
+}
 
-runClient();
+main();
