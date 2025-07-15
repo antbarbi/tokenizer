@@ -131,7 +131,6 @@ pub struct TransferTokens<'info> {
     
     #[account(
         mut,
-        // Add this constraint to verify destination is for the correct mint
         token::mint = source.mint,
     )]
     pub destination: Account<'info, TokenAccount>,
