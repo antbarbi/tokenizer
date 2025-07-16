@@ -1,12 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
-// Add these imports
-use anchor_spl::metadata::{
-    create_metadata_accounts_v3,
-    CreateMetadataAccountsV3,
-    Metadata,
-};
 
+// Program unique address in solana blockchain is set automtically by SolPlayground 
 declare_id!("8habFRuakcsNxRugQiTs77jxfug2mTSaWY6WJTooiuGt");
 
 #[program]
@@ -62,6 +57,11 @@ mod token_program {
         Ok(())
     }
 }
+
+// Each instruction needs to explicitly declare:
+// 1. WHICH accounts it will use
+// 2. HOW it will use them (read/write/create)
+// 3. WHAT validation rules apply
 
 #[derive(Accounts)]
 pub struct CreateMint<'info> {
