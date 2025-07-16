@@ -73,20 +73,6 @@ Phantom and Solflare are the leading wallets for the Solana ecosystem.
 
 5. **NFT Support**: Phantom and Solflare offer excellent support for viewing and managing NFTs on Solana.
 
-### Testnet: Solana Devnet
-
-Solana Devnet is a development environment for testing applications before mainnet deployment.
-
-**Advantages**:
-
-1. **Free Testing**: Devnet allows developers to test their applications with free SOL obtained from faucets.
-
-2. **Network Stability**: The Devnet is maintained by the Solana Foundation and offers a reliable environment for development.
-
-3. **Similar to Mainnet**: Devnet closely mirrors the Solana mainnet in terms of functionality, ensuring accurate testing.
-
-4. **Explorer Integration**: Solana explorers like Solscan and Solana Beach support Devnet, making it easy to track transactions and debug issues.
-
 ### IDE: Solana Playground
 
 Solana Playground is a web-based development environment specifically designed for Solana development.

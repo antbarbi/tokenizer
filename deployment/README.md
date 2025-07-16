@@ -11,9 +11,7 @@ This guide provides step-by-step instructions for deploying and testing the 42nu
 
 ## Environment Setup
 
-### Option 1: Solana Playground (Web-based) 🌐
-
-1. **Launch Solana Localhost** 
+1. **Launch [Solana Test Validator](https://solana.com/developers/guides/getstarted/solana-test-validator)** 
 
     At the root of the project 
     ```bash
@@ -30,7 +28,7 @@ This guide provides step-by-step instructions for deploying and testing the 42nu
 
 3. **Configure Environment**
    - Select Solana Localhost (gear, bottom left)
-   - Click on `not connected` next to the gear
+   - Click on `not connected` next to the gear and follow instructions
    - Generate 3 playground wallets on the top right (wallet1, wallet2, wallet3)
 
 ## Deployment Process
@@ -46,11 +44,10 @@ This guide provides step-by-step instructions for deploying and testing the 42nu
 **Solana Playground:**
 - Click "Deploy" button
 - Confirm transaction in built-in wallet
-- Note the deployed program ID
 
 ## Testing the Program
 
-Test are already provided in `code` and `bonus`, in SolanaPlayground click on `run` in the IDE.
+Tests are already provided in `code` and `bonus`, in SolanaPlayground click on `run` in the IDE.
 
 ## Support Resources
 
