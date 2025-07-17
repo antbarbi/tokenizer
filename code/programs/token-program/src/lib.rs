@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::associated_token::AssociatedToken;
 
 // Program unique address in solana blockchain is set automtically by SolPlayground 
 declare_id!("8habFRuakcsNxRugQiTs77jxfug2mTSaWY6WJTooiuGt");
@@ -87,10 +88,8 @@ pub struct CreateTokenAccount<'info> {
     #[account(
         init,
         payer = owner,
-        token::mint = mint,
-        token::authority = owner,
-        seeds = [b"token_account", owner.key().as_ref(), mint.key().as_ref()],
-        bump
+        associated_token::mint = mint,
+        associated_token::authority = owner,
     )]
     pub token_account: Account<'info, TokenAccount>,
     
@@ -100,7 +99,7 @@ pub struct CreateTokenAccount<'info> {
     pub owner: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub rent: Sysvar<'info, Rent>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 #[derive(Accounts)]

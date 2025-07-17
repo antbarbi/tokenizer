@@ -1,5 +1,17 @@
 import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY, Keypair, Transaction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAccount } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, getAccount, getAssociatedTokenAddressSync, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+
+
+// Add this helper function
+async function accountExists(address: PublicKey): Promise<boolean> {
+  const provider = anchor.AnchorProvider.env();
+  try {
+    const account = await provider.connection.getAccountInfo(address);
+    return account !== null;
+  } catch (error) {
+    return false;
+  }
+}
 
 // client.ts
 async function main() {
@@ -21,28 +33,19 @@ async function main() {
   console.log("Second wallet public key:", secondWallet.publicKey.toString());
 
   try {
-    const accountExists = async (pubkey) => {
-      try {
-        const accountInfo = await provider.connection.getAccountInfo(pubkey);
-        return accountInfo !== null;
-      } catch (e) {
-        return false;
-      }
-    };
-
-    // 1. DERIVE MINT PDA
+    // 1. DERIVE MINT PDA (keep this the same)
     const [mintPDA] = PublicKey.findProgramAddressSync(
       [Buffer.from("token_mint"), wallet.publicKey.toBuffer()],
       programId
     );
     console.log("Mint PDA:", mintPDA.toString());
     
-    // 2. CREATE MINT
+    // 2. CREATE MINT (keep this the same)
     const mintExists = await accountExists(mintPDA);
     if (!mintExists) {
       console.log("Creating mint...");
       await program.methods
-        .createMint(9) // 9 decimals
+        .createMint(9)
         .accounts({
           mint: mintPDA,
           payer: wallet.publicKey,
@@ -53,172 +56,115 @@ async function main() {
         .rpc();
       console.log("Mint created successfully");
     } else {
-      console.log("Mint already exists, skipping creation");
+      console.log("Mint already exists");
     }
     
-    // 3. DERIVE FIRST TOKEN ACCOUNT PDA (for main wallet)
-    const [tokenAccount1PDA] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("token_account"),
-        wallet.publicKey.toBuffer(),
-        mintPDA.toBuffer()
-      ],
-      programId
+    // 3. DERIVE ATA ADDRESSES (REPLACE PDA derivation)
+    const tokenAccount1ATA = getAssociatedTokenAddressSync(
+      mintPDA,
+      wallet.publicKey
     );
-    console.log("First Token Account PDA:", tokenAccount1PDA.toString());
+    console.log("First Token Account ATA:", tokenAccount1ATA.toString());
+    
+    const tokenAccount2ATA = getAssociatedTokenAddressSync(
+      mintPDA,
+      secondWallet.publicKey
+    );
+    console.log("Second Token Account ATA:", tokenAccount2ATA.toString());
     
     // 4. CREATE FIRST TOKEN ACCOUNT
-    const token1Exists = await accountExists(tokenAccount1PDA);
+    const token1Exists = await accountExists(tokenAccount1ATA);
     if (!token1Exists) {
       console.log("Creating first token account...");
       await program.methods
         .createTokenAccount()
         .accounts({
-          tokenAccount: tokenAccount1PDA,
+          tokenAccount: tokenAccount1ATA,
           mint: mintPDA,
           owner: wallet.publicKey,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
-          rent: SYSVAR_RENT_PUBKEY,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
         .rpc();
+      console.log("First token account created");
     } else {
-      console.log("First token account already exists, skipping creation");
+      console.log("First token account already exists");
     }
-
     
-    // 5. DERIVE SECOND TOKEN ACCOUNT PDA (for second wallet)
-    const [tokenAccount2PDA] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("token_account"),
-        secondWallet.publicKey.toBuffer(),
-        mintPDA.toBuffer()
-      ],
-      programId
-    );
-    console.log("Second Token Account PDA:", tokenAccount2PDA.toString());
-    
-    // 6. CREATE SECOND TOKEN ACCOUNT
-    // Need to fund second wallet with a small amount of SOL for rent
+    // 5. FUND SECOND WALLET (keep this the same)
     const transferSolTx = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: wallet.publicKey,
         toPubkey: secondWallet.publicKey,
-        lamports: 10000000, // 0.01 SOL
+        lamports: 10000000,
       })
     );
     await provider.sendAndConfirm(transferSolTx);
     console.log("Funded second wallet with SOL");
     
-    const token2Exists = await accountExists(tokenAccount2PDA);
+    // 6. CREATE SECOND TOKEN ACCOUNT
+    const token2Exists = await accountExists(tokenAccount2ATA);
     if (!token2Exists) {
       console.log("Creating second token account...");
       await program.methods
         .createTokenAccount()
         .accounts({
-          tokenAccount: tokenAccount2PDA,
+          tokenAccount: tokenAccount2ATA,
           mint: mintPDA,
           owner: secondWallet.publicKey,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
-          rent: SYSVAR_RENT_PUBKEY,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
         .signers([secondWallet])
         .rpc();
+      console.log("Second token account created");
     } else {
-      console.log("Second token account already exists, skipping creation");
+      console.log("Second token account already exists");
     }
 
-    // Fetch token account information BEFORE displaying balances
-    let tokenAccount1 = await getAccount(
-      provider.connection, 
-      tokenAccount1PDA,
-      'confirmed'
-    );
-    let tokenAccount2 = await getAccount(
-      provider.connection, 
-      tokenAccount2PDA,
-      'confirmed'
-    );
-
-    console.log("First token account balance:", 
-      tokenAccount1.amount.toString() / Math.pow(10, 9), "tokens");
-    console.log("Second token account balance:", 
-      tokenAccount2.amount.toString() / Math.pow(10, 9), "tokens");
-
-
-    // 7. MINT TOKENS TO FIRST ACCOUNT
+// 7. MINT TOKENS (update account addresses)
     const mintAmount = new anchor.BN(1000000000); // 1 token with 9 decimals
     console.log("Minting tokens to first account...");
     await program.methods
       .mintTokens(mintAmount)
       .accounts({
         mint: mintPDA,
-        tokenAccount: tokenAccount1PDA,
+        tokenAccount: tokenAccount1ATA,
         mintAuthority: wallet.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
 
-    tokenAccount1 = await getAccount(
-      provider.connection, 
-      tokenAccount1PDA,
-      'confirmed'
-    );
-    tokenAccount2 = await getAccount(
-      provider.connection, 
-      tokenAccount2PDA,
-      'confirmed'
-    );
+    // 8. INITIAL BALANCES
+    let tokenAccount1 = await getAccount(provider.connection, tokenAccount1ATA, 'confirmed');
+    let tokenAccount2 = await getAccount(provider.connection, tokenAccount2ATA, 'confirmed');
 
-    console.log("First token account balance:", 
-      tokenAccount1.amount.toString() / Math.pow(10, 9), "tokens");
-    console.log("Second token account balance:", 
-      tokenAccount2.amount.toString() / Math.pow(10, 9), "tokens");
+    console.log("BEFORE TRANSFER:");
+    console.log("Account 1:", Number(tokenAccount1.amount) / Math.pow(10, 9), "tokens");
+    console.log("Account 2:", Number(tokenAccount2.amount) / Math.pow(10, 9), "tokens");
 
-    // 8. TRANSFER TOKENS FROM FIRST TO SECOND ACCOUNT
-    try {
-      const transferAmount = new anchor.BN(500000000); // 0.5 tokens
-      console.log("Transferring tokens from first to second account...");
-      const tx = await program.methods
-        .transferTokens(transferAmount)
-        .accounts({
-          source: tokenAccount1PDA,
-          destination: tokenAccount2PDA,
-          authority: wallet.publicKey,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .rpc({ commitment: 'confirmed' });
-      console.log("Transfer transaction signature:", tx);
-      
-      // Wait a moment for the transaction to be fully processed
-      const latestBlockhash = await provider.connection.getLatestBlockhash();
-      await provider.connection.confirmTransaction({
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        signature: tx
-      });
-      
-    } catch (error) {
-      console.error("Transfer failed with error:", error);
-    }
-    
-    // 9. DISPLAY TOKEN BALANCES
-    tokenAccount1 = await getAccount(
-      provider.connection, 
-      tokenAccount1PDA,
-      'confirmed'
-    );
-    tokenAccount2 = await getAccount(
-      provider.connection, 
-      tokenAccount2PDA,
-      'confirmed'
-    );
+    // 9. TRANSFER TOKENS
+    const transferAmount = new anchor.BN(500000000); // 0.5 tokens
+    console.log("\nTransferring 0.5 tokens...");
+    await program.methods
+      .transferTokens(transferAmount)
+      .accounts({
+        source: tokenAccount1ATA,
+        destination: tokenAccount2ATA,
+        authority: wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
 
-    console.log("First token account balance:", 
-      tokenAccount1.amount.toString() / Math.pow(10, 9), "tokens");
-    console.log("Second token account balance:", 
-      tokenAccount2.amount.toString() / Math.pow(10, 9), "tokens");
+    // 10. FINAL BALANCES
+    tokenAccount1 = await getAccount(provider.connection, tokenAccount1ATA, 'confirmed');
+    tokenAccount2 = await getAccount(provider.connection, tokenAccount2ATA, 'confirmed');
+
+    console.log("\nAFTER TRANSFER:");
+    console.log("Account 1:", Number(tokenAccount1.amount) / Math.pow(10, 9), "tokens");
+    console.log("Account 2:", Number(tokenAccount2.amount) / Math.pow(10, 9), "tokens");
 
   } catch (error) {
     console.error("Error:", error);
