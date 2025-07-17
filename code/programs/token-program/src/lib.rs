@@ -36,7 +36,6 @@ mod token_program {
     }
 
     pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
-        // Create the transfer CPI instruction
         let cpi_accounts = token::Transfer {
             from: ctx.accounts.source.to_account_info(),
             to: ctx.accounts.destination.to_account_info(),
@@ -46,7 +45,6 @@ mod token_program {
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         
-        // Execute transfer
         token::transfer(cpi_ctx, amount)?;
         
         msg!("Transferred {} tokens from {} to {}", 
@@ -58,11 +56,6 @@ mod token_program {
         Ok(())
     }
 }
-
-// Each instruction needs to explicitly declare:
-// 1. WHICH accounts it will use
-// 2. HOW it will use them (read/write/create)
-// 3. WHAT validation rules apply
 
 #[derive(Accounts)]
 pub struct CreateMint<'info> {
