@@ -33,7 +33,7 @@ ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
 RUN curl -sSfL https://release.anza.xyz/stable/install | sh \
     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> ~/.zshrc
 
-# Install Node.js (for Metaplex JS SDK)
+# Install Node.js (for development)
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs
 
@@ -42,18 +42,10 @@ RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
     && avm install latest \
     && avm use latest
 
-# Install Metaplex JS SDK (for token metadata)
-RUN npm install -g @metaplex-foundation/js @metaplex-foundation/mpl-token-metadata
-
-# Create directories for Metaplex programs
-RUN mkdir -p /root/program-bins
-
-# Download Metaplex Token Metadata program (needed for token names/symbols)
-RUN curl -L https://github.com/metaplex-foundation/metaplex-program-library/releases/download/token-metadata-v1.13.2/mpl_token_metadata.so \
-    -o /root/program-bins/mpl_token_metadata.so
-
+# Generate keypair
 RUN solana-keygen new --no-bip39-passphrase
 
+# Configure Solana
 RUN solana config set --url localhost --keypair /root/.config/solana/id.json
 
 COPY ./entrypoint.sh /entrypoint.sh
