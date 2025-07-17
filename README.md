@@ -1,7 +1,7 @@
 # Tokenizer: 42nug
 <img src="documentation/icon_42nug.png" alt="icon" width="100">  
 
-This project focuses on the creation and deployment of a personal token named 42nug on the Solana blockchain. It demonstrates some simple functionalities such as minting, burning, and transferring tokens within a bounty system.
+This project focuses on the creation and deployment of a personal token named 42nug on the Solana blockchain. It demonstrates some simple functionalities such as minting, burning, and transferring tokens.
 
 ## Project Implementation
 
