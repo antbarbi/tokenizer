@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-// Fix: Use token_interface for Token Extensions compatibility
 use anchor_spl::token_interface::{Mint, TokenInterface, TokenAccount};
 use anchor_spl::associated_token::AssociatedToken;
 
@@ -29,8 +28,14 @@ mod token_program {
     }
     
     // Create mint with multisig authority (TOKEN EXTENSIONS COMPATIBLE)
-    pub fn create_multisig_mint(ctx: Context<CreateMultisigMint>, decimals: u8) -> Result<()> {
-        msg!("Token Extensions mint created with multisig authority: {}", ctx.accounts.multisig.key());
+    pub fn create_multisig_mint(
+        ctx: Context<CreateMultisigMint>, 
+        decimals: u8
+    ) -> Result<()> {
+        // The mint is already created by Anchor with Token Extensions support
+        // Metadata will be added separately via client-side instructions
+        msg!("Token Extensions mint created with decimals: {}, Authority: {}", 
+             decimals, ctx.accounts.multisig.key());
         Ok(())
     }
 
@@ -112,9 +117,10 @@ mod token_program {
         
         multisig.nonce += 1;
         
-        // Use Token Extensions for transfer
-        let cpi_accounts = anchor_spl::token_interface::Transfer {
+        // Use Token Extensions for transfer with transfer_checked (recommended)
+        let cpi_accounts = anchor_spl::token_interface::TransferChecked {
             from: ctx.accounts.from_ata.to_account_info(),
+            mint: ctx.accounts.mint.to_account_info(),
             to: ctx.accounts.to_ata.to_account_info(),
             authority: ctx.accounts.from_authority.to_account_info(),
         };
@@ -122,14 +128,15 @@ mod token_program {
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         
-        anchor_spl::token_interface::transfer(cpi_ctx, amount)?;
+        // Use transfer_checked instead of deprecated transfer
+        anchor_spl::token_interface::transfer_checked(cpi_ctx, amount, ctx.accounts.mint.decimals)?;
         
         msg!("Multisig transferred {} tokens", amount);
         Ok(())
     }
 }
 
-// Multisig account structure (unchanged)
+// Multisig account structure
 #[account]
 pub struct Multisig {
     pub signers: Vec<Pubkey>,
@@ -138,13 +145,13 @@ pub struct Multisig {
     pub bump: u8,
 }
 
-// Create multisig account (unchanged)
+// Create multisig account
 #[derive(Accounts)]
 pub struct CreateMultisig<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + 4 + 32 * 10 + 1 + 8 + 1,
+        space = 8 + 4 + 32 * 10 + 1 + 8 + 1, // Account discriminator + Vec<Pubkey> + threshold + nonce + bump
         seeds = [b"multisig", payer.key().as_ref()],
         bump
     )]
@@ -155,7 +162,7 @@ pub struct CreateMultisig<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// Create mint with Token Extensions support - FIXED
+// Create mint with Token Extensions support (simplified)
 #[derive(Accounts)]
 pub struct CreateMultisigMint<'info> {
     #[account(
@@ -164,6 +171,7 @@ pub struct CreateMultisigMint<'info> {
         mint::decimals = 9,
         mint::authority = multisig,
         mint::token_program = token_program,
+        mint::freeze_authority = multisig,
         seeds = [b"mint", multisig.key().as_ref()],
         bump
     )]
@@ -174,11 +182,11 @@ pub struct CreateMultisigMint<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
-    pub token_program: Interface<'info, TokenInterface>, // Changed from Token2022 to TokenInterface
+    pub token_program: Interface<'info, TokenInterface>,
     pub rent: Sysvar<'info, Rent>,
 }
 
-// Create Associated Token Account - FIXED
+// Create Associated Token Account
 #[derive(Accounts)]
 pub struct CreateAssociatedTokenAccount<'info> {
     #[account(
@@ -199,11 +207,11 @@ pub struct CreateAssociatedTokenAccount<'info> {
     pub payer: Signer<'info>,
     
     pub system_program: Program<'info, System>,
-    pub token_program: Interface<'info, TokenInterface>, // Changed from Token2022 to TokenInterface
+    pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-// Multisig mint tokens with ATA - FIXED
+// Multisig mint tokens with ATA
 #[derive(Accounts)]
 pub struct MultisigMintTokens<'info> {
     #[account(
@@ -228,25 +236,26 @@ pub struct MultisigMintTokens<'info> {
     pub multisig: Account<'info, Multisig>,
     
     pub payer: Signer<'info>,
-    pub token_program: Interface<'info, TokenInterface>, // Changed from Token2022 to TokenInterface
+    pub token_program: Interface<'info, TokenInterface>,
     // remaining_accounts will contain the signers
 }
 
-// Transfer between ATAs - FIXED
+// Transfer between ATAs - FULLY FIXED VERSION
 #[derive(Accounts)]
 pub struct MultisigTransfer<'info> {
     #[account(
         mut,
-        token::mint = mint,
-        token::authority = from_authority,
-        token::token_program = token_program,
+        associated_token::mint = mint,
+        associated_token::authority = from_authority,
+        associated_token::token_program = token_program,
     )]
     pub from_ata: InterfaceAccount<'info, TokenAccount>,
     
     #[account(
         mut,
-        token::mint = mint,
-        token::token_program = token_program,
+        associated_token::mint = mint,
+        associated_token::authority = to_authority,  // ✅ FIXED: Added missing authority
+        associated_token::token_program = token_program,
     )]
     pub to_ata: InterfaceAccount<'info, TokenAccount>,
     
@@ -255,14 +264,17 @@ pub struct MultisigTransfer<'info> {
     /// CHECK: Authority for the from_ata
     pub from_authority: AccountInfo<'info>,
     
+    /// CHECK: Authority for the to_ata  
+    pub to_authority: AccountInfo<'info>,
+    
     #[account(mut)]
     pub multisig: Account<'info, Multisig>,
     
-    pub token_program: Interface<'info, TokenInterface>, // Changed from Token2022 to TokenInterface
+    pub token_program: Interface<'info, TokenInterface>,
     // remaining_accounts will contain the signers
 }
 
-// Custom errors (unchanged)
+// Custom errors
 #[error_code]
 pub enum CustomError {
     #[msg("Invalid threshold: must be > 0 and <= number of signers")]

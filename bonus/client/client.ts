@@ -1,13 +1,5 @@
-import { 
-  TOKEN_2022_PROGRAM_ID,
-  getAssociatedTokenAddressSync, 
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  createInitializeMetadataPointerInstruction,
-  createInitializeInstruction,
-  createAssociatedTokenAccountInstruction,
-  getMintLen,
-  ExtensionType,
-} from '@solana/spl-token';
+// Remove the import statement and use the global TOKEN_2022_PROGRAM_ID
+// Solana Playground has these available globally
 
 class RealMultisigClient {
   private connection: any;
@@ -45,7 +37,6 @@ class RealMultisigClient {
         console.log("[FOUND] Existing multisig detected!");
         console.log(`Signers: ${existingMultisig.signers.length}, Threshold: ${existingMultisig.threshold}`);
         
-        // Check if current playground wallets match
         const currentSigners = [
           pg.wallets.wallet1.keypair.publicKey,
           pg.wallets.wallet2.keypair.publicKey,
@@ -85,7 +76,6 @@ class RealMultisigClient {
     try {
       console.log("[INIT] Creating multisig setup with Token Extensions metadata...");
 
-      // Step 1: Use Solana Playground wallets as signers
       const signer1 = pg.wallets.wallet1.keypair;
       const signer2 = pg.wallets.wallet2.keypair;
       const signer3 = pg.wallets.wallet3.keypair;
@@ -109,7 +99,7 @@ class RealMultisigClient {
         }
       }
 
-      // Step 2: Handle multisig account (reuse if exists, create if not)
+      // Handle multisig account
       const [multisigPDA] = web3.PublicKey.findProgramAddressSync(
         [Buffer.from("multisig"), this.wallet.publicKey.toBuffer()],
         this.program.programId
@@ -120,7 +110,6 @@ class RealMultisigClient {
       let existingSigners = null;
       let createMultisigTx = null;
 
-      // Check if multisig already exists
       try {
         const existingMultisig = await this.program.account.multisig.fetch(multisigPDA);
         console.log("[WARN] Multisig already exists, checking if our wallets match...");
@@ -135,18 +124,17 @@ class RealMultisigClient {
         
         if (signersMatch) {
           console.log("[SUCCESS] Our playground wallets match the existing multisig!");
-          existingSigners = null; // Treat as new so we can use our wallets
+          existingSigners = null;
         } else {
           console.log("[ERROR] Our playground wallets don't match existing multisig");
         }
         
       } catch (error) {
-        // Account doesn't exist, create it
         console.log("[CREATE] Creating new multisig with playground wallets...");
         createMultisigTx = await this.program.methods
           .createMultisig(
             [signer1.publicKey, signer2.publicKey, signer3.publicKey],
-            2 // Threshold: need 2 signatures
+            2
           )
           .accounts({
             multisig: multisigPDA,
@@ -159,15 +147,14 @@ class RealMultisigClient {
         console.log(`[TX] Multisig creation tx: ${createMultisigTx}`);
       }
 
-      // Step 3: Create mint with Token Extensions and metadata support
+      // Create mint with Token Extensions
       const [mintPDA] = web3.PublicKey.findProgramAddressSync(
         [Buffer.from("mint"), multisigPDA.toBuffer()],
         this.program.programId
       );
 
-      console.log(`\n[MINT] Creating Token Extensions mint with metadata: ${mintPDA.toString()}`);
+      console.log(`\n[MINT] Creating Token Extensions mint: ${mintPDA.toString()}`);
 
-      // Define token metadata
       const metadata = {
         name: "42Nug",
         symbol: "42N",
@@ -179,13 +166,12 @@ class RealMultisigClient {
         const existingMint = await this.connection.getAccountInfo(mintPDA);
         if (existingMint) {
           console.log("[WARN] Mint already exists, skipping creation...");
-          console.log(`[MINT] Existing mint: ${mintPDA.toString()}`);
           createMintTx = "EXISTING_MINT";
         } else {
           throw new Error("Mint doesn't exist");
         }
       } catch (error) {
-        console.log("[CREATE] Creating new Token Extensions mint with metadata...");
+        console.log("[CREATE] Creating new Token Extensions mint...");
         
         createMintTx = await this.program.methods
           .createMultisigMint(9)
@@ -194,21 +180,22 @@ class RealMultisigClient {
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
             systemProgram: web3.SystemProgram.programId,
-            tokenProgram: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
             rent: web3.SYSVAR_RENT_PUBKEY,
           })
           .rpc();
 
         console.log("[SUCCESS] Token Extensions mint created!");
         console.log(`[TX] Mint creation tx: ${createMintTx}`);
+        console.log("[INFO] Metadata support ready for Token Extensions");
       }
 
-      // Step 4: Create Associated Token Account
-      const tokenAccountATA = getAssociatedTokenAddressSync(
+      // Create Associated Token Account
+      const tokenAccountATA = splToken.getAssociatedTokenAddressSync(
         mintPDA,
         this.wallet.publicKey,
         false,
-        TOKEN_2022_PROGRAM_ID
+        splToken.TOKEN_2022_PROGRAM_ID
       );
 
       console.log(`\n[TOKEN] Creating Associated Token Account: ${tokenAccountATA.toString()}`);
@@ -232,8 +219,8 @@ class RealMultisigClient {
             owner: this.wallet.publicKey,
             payer: this.wallet.publicKey,
             systemProgram: web3.SystemProgram.programId,
-            tokenProgram: TOKEN_2022_PROGRAM_ID,
-            associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
+            associatedTokenProgram: splToken.ASSOCIATED_TOKEN_PROGRAM_ID,
           })
           .rpc();
 
@@ -241,7 +228,7 @@ class RealMultisigClient {
         console.log(`[TX] Token account tx: ${createTokenAccountTx}`);
       }
 
-      // Step 5: Perform multisig operations if we have matching wallets
+      // Perform multisig operations
       if (!existingSigners) {
         await this.performMultisigMinting(mintPDA, tokenAccountATA, multisigPDA, signer1, signer2, signer3);
       } else {
@@ -299,7 +286,7 @@ class RealMultisigClient {
     console.log("[INFO] This requires 2 out of 3 playground wallet signatures!");
 
     try {
-      // SUCCESSFUL CASE: 2-of-3 signatures (meets threshold)
+      // SUCCESSFUL CASE: 2-of-3 signatures
       console.log("\n🟢 TESTING: Successful mint with 2 signatures (meets threshold)...");
       const mintTxSig = await this.program.methods
         .multisigMintTokens(new anchor.BN(mintAmount))
@@ -309,7 +296,7 @@ class RealMultisigClient {
           owner: this.wallet.publicKey,
           multisig: multisigPDA,
           payer: this.wallet.publicKey,
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
+          tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
         })
         .remainingAccounts([
           { pubkey: wallet1.publicKey, isWritable: false, isSigner: true },
@@ -325,41 +312,30 @@ class RealMultisigClient {
       const tokenAccountInfo = await this.connection.getTokenAccountBalance(tokenAccountATA);
       console.log(`[SUCCESS] Token balance: ${tokenAccountInfo.value.uiAmount} tokens`);
 
-      // FAILURE CASE: Test insufficient signatures (1-of-3, below threshold)
+      // FAILURE CASE: Test insufficient signatures
       console.log("\n🔴 TESTING: Mint with insufficient signatures (1 signature, below threshold of 2)...");
       
       try {
         await this.program.methods
-          .multisigMintTokens(new anchor.BN(500000000)) // 0.5 tokens
+          .multisigMintTokens(new anchor.BN(500000000))
           .accounts({
             mint: mintPDA,
             associatedTokenAccount: tokenAccountATA,
             owner: this.wallet.publicKey,
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
-            tokenProgram: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
           })
           .remainingAccounts([
             { pubkey: wallet1.publicKey, isWritable: false, isSigner: true },
-            // Only 1 signer instead of required 2
           ])
-          .signers([wallet1]) // Only 1 signer
+          .signers([wallet1])
           .rpc();
           
         console.log("❌ [ERROR] This transaction should have failed but didn't!");
       } catch (error) {
         console.log("✅ [SUCCESS] Correctly rejected insufficient signatures!");
         console.log(`[INFO] Error message: ${error.message}`);
-        if (error.logs) {
-          const relevantLogs = error.logs.filter(log => 
-            log.includes("NotEnoughSignatures") || 
-            log.includes("Custom") ||
-            log.includes("Error")
-          );
-          if (relevantLogs.length > 0) {
-            console.log(`[PROGRAM] Error details: ${relevantLogs.join(", ")}`);
-          }
-        }
       }
 
       // FAILURE CASE: Test with no signatures
@@ -367,19 +343,17 @@ class RealMultisigClient {
       
       try {
         await this.program.methods
-          .multisigMintTokens(new anchor.BN(250000000)) // 0.25 tokens
+          .multisigMintTokens(new anchor.BN(250000000))
           .accounts({
             mint: mintPDA,
             associatedTokenAccount: tokenAccountATA,
             owner: this.wallet.publicKey,
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
-            tokenProgram: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
           })
-          .remainingAccounts([
-            // No signers at all
-          ])
-          .signers([]) // No signers
+          .remainingAccounts([])
+          .signers([])
           .rpc();
           
         console.log("❌ [ERROR] This transaction should have failed but didn't!");
@@ -388,26 +362,26 @@ class RealMultisigClient {
         console.log(`[INFO] Error message: ${error.message}`);
       }
 
-      // SUCCESS CASE: Test with all 3 signatures (exceeds threshold)
+      // SUCCESS CASE: Test with all 3 signatures
       console.log("\n🟢 TESTING: Mint with all 3 signatures (exceeds threshold)...");
       
       try {
         const allSignersTx = await this.program.methods
-          .multisigMintTokens(new anchor.BN(100000000)) // 0.1 tokens
+          .multisigMintTokens(new anchor.BN(100000000))
           .accounts({
             mint: mintPDA,
             associatedTokenAccount: tokenAccountATA,
             owner: this.wallet.publicKey,
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
-            tokenProgram: TOKEN_2022_PROGRAM_ID,
+            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
           })
           .remainingAccounts([
             { pubkey: wallet1.publicKey, isWritable: false, isSigner: true },
             { pubkey: wallet2.publicKey, isWritable: false, isSigner: true },
             { pubkey: wallet3.publicKey, isWritable: false, isSigner: true },
           ])
-          .signers([wallet1, wallet2, wallet3]) // All 3 signers
+          .signers([wallet1, wallet2, wallet3])
           .rpc();
           
         console.log("✅ [SUCCESS] All 3 signatures accepted!");
