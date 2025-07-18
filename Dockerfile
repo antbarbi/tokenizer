@@ -33,14 +33,14 @@ ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
 RUN curl -sSfL https://release.anza.xyz/stable/install | sh \
     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> ~/.zshrc
 
-# Install Node.js (for development)
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
+# # Install Node.js (for development)
+# RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+#     && apt-get install -y nodejs
 
-# Install Anchor CLI
-RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force \
-    && avm install latest \
-    && avm use latest
+# # Install Anchor CLI
+# RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force \
+#     && avm install latest \
+#     && avm use latest
 
 # Generate keypair
 RUN solana-keygen new --no-bip39-passphrase

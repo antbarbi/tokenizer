@@ -1,5 +1,28 @@
-// Remove the import statement and use the global TOKEN_2022_PROGRAM_ID
-// Solana Playground has these available globally
+import { 
+  PublicKey, 
+  SystemProgram, 
+  SYSVAR_RENT_PUBKEY, 
+  Keypair, 
+  Transaction, 
+  TransactionInstruction 
+} from '@solana/web3.js';
+import { 
+  TOKEN_PROGRAM_ID, 
+  TOKEN_2022_PROGRAM_ID,
+  getAccount, 
+  getAssociatedTokenAddressSync, 
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  createInitializeMetadataPointerInstruction,
+  createInitializeMintInstruction,
+  createInitializeInstruction,
+  createMintToInstruction,
+  createTransferInstruction,
+  createAssociatedTokenAccountInstruction,
+  getMintLen,
+  ExtensionType,
+  LENGTH_SIZE,
+  TYPE_SIZE,
+} from '@solana/spl-token';
 
 class RealMultisigClient {
   private connection: any;
@@ -180,50 +203,87 @@ class RealMultisigClient {
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
             systemProgram: web3.SystemProgram.programId,
-            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
+            tokenProgram: TOKEN_2022_PROGRAM_ID,
             rent: web3.SYSVAR_RENT_PUBKEY,
           })
           .rpc();
 
         console.log("[SUCCESS] Token Extensions mint created!");
         console.log(`[TX] Mint creation tx: ${createMintTx}`);
+        // --- Robust metadata pointer/metadata initialization ---
+        if (createMintTx !== "EXISTING_MINT") {
+          console.log("[METADATA] Initializing Token Extensions metadata...");
+          const metadataPointerIx = createInitializeMetadataPointerInstruction(
+            mintPDA,
+            this.wallet.publicKey, // update authority
+            mintPDA,               // metadata address (can be the mint itself)
+            TOKEN_2022_PROGRAM_ID
+          );
+          const metadataIx = createInitializeInstruction({
+            programId: TOKEN_2022_PROGRAM_ID,
+            metadata: mintPDA,
+            updateAuthority: this.wallet.publicKey,
+            mint: mintPDA,
+            mintAuthority: this.wallet.publicKey,
+            name: metadata.name,
+            symbol: metadata.symbol,
+            uri: metadata.uri,
+          });
+          const tx = new Transaction().add(metadataPointerIx, metadataIx);
+          try {
+            const sig = await this.connection.sendTransaction(tx, [this.wallet.payer]);
+            console.log("[METADATA] Metadata initialized!");
+            console.log(`[TX] Metadata init tx: ${sig}`);
+          } catch (error) {
+            if (
+              error.message &&
+              (error.message.includes("custom program error: 0x6") ||
+                error.message.includes("account or token already in use"))
+            ) {
+              console.log("[WARN] Metadata pointer already initialized, skipping.");
+            } else {
+              throw error;
+            }
+          }
+        }
         console.log("[INFO] Metadata support ready for Token Extensions");
       }
 
-      // Create Associated Token Account
-      const tokenAccountATA = splToken.getAssociatedTokenAddressSync(
+      // Create Associated Token Account using robust SPL Token logic
+      const tokenAccountATA = getAssociatedTokenAddressSync(
         mintPDA,
         this.wallet.publicKey,
         false,
-        splToken.TOKEN_2022_PROGRAM_ID
+        TOKEN_2022_PROGRAM_ID
       );
 
       console.log(`\n[TOKEN] Creating Associated Token Account: ${tokenAccountATA.toString()}`);
 
       let createTokenAccountTx = null;
+      let ataInitialized = false;
       try {
-        const existingTokenAccount = await this.connection.getAccountInfo(tokenAccountATA);
-        if (existingTokenAccount) {
-          console.log("[WARN] Token account already exists, skipping creation...");
-          createTokenAccountTx = "EXISTING_TOKEN_ACCOUNT";
-        } else {
-          throw new Error("Token account doesn't exist");
-        }
-      } catch (error) {
+        await getAccount(this.connection, tokenAccountATA, 'confirmed', TOKEN_2022_PROGRAM_ID);
+        ataInitialized = true;
+      } catch (e) {
+        ataInitialized = false;
+      }
+      if (ataInitialized) {
+        console.log("[WARN] Token account already exists and is initialized, skipping creation...");
+        createTokenAccountTx = "EXISTING_TOKEN_ACCOUNT";
+      } else {
         console.log("[CREATE] Creating new Associated Token Account...");
-        createTokenAccountTx = await this.program.methods
-          .createAssociatedTokenAccount()
-          .accounts({
-            associatedTokenAccount: tokenAccountATA,
-            mint: mintPDA,
-            owner: this.wallet.publicKey,
-            payer: this.wallet.publicKey,
-            systemProgram: web3.SystemProgram.programId,
-            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
-            associatedTokenProgram: splToken.ASSOCIATED_TOKEN_PROGRAM_ID,
-          })
-          .rpc();
-
+        const createATAIx = createAssociatedTokenAccountInstruction(
+          this.wallet.publicKey, // payer
+          tokenAccountATA,       // ata
+          this.wallet.publicKey, // owner
+          mintPDA,               // mint
+          TOKEN_2022_PROGRAM_ID,
+          ASSOCIATED_TOKEN_PROGRAM_ID
+        );
+        const tx = new Transaction().add(createATAIx);
+        createTokenAccountTx = await this.connection.sendTransaction(tx, [this.wallet.payer]);
+        // Wait for confirmation before proceeding
+        await this.connection.confirmTransaction(createTokenAccountTx, 'confirmed');
         console.log("[SUCCESS] Associated Token Account created!");
         console.log(`[TX] Token account tx: ${createTokenAccountTx}`);
       }
@@ -296,7 +356,7 @@ class RealMultisigClient {
           owner: this.wallet.publicKey,
           multisig: multisigPDA,
           payer: this.wallet.publicKey,
-          tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
         })
         .remainingAccounts([
           { pubkey: wallet1.publicKey, isWritable: false, isSigner: true },
@@ -324,7 +384,7 @@ class RealMultisigClient {
             owner: this.wallet.publicKey,
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
-            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
+            tokenProgram: TOKEN_2022_PROGRAM_ID,
           })
           .remainingAccounts([
             { pubkey: wallet1.publicKey, isWritable: false, isSigner: true },
@@ -350,7 +410,7 @@ class RealMultisigClient {
             owner: this.wallet.publicKey,
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
-            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
+            tokenProgram:  TOKEN_2022_PROGRAM_ID,
           })
           .remainingAccounts([])
           .signers([])
@@ -367,14 +427,14 @@ class RealMultisigClient {
       
       try {
         const allSignersTx = await this.program.methods
-          .multisigMintTokens(new anchor.BN(100000000))
+          .multisigMintTokens(new anchor.BN(1_000_000_000))
           .accounts({
             mint: mintPDA,
             associatedTokenAccount: tokenAccountATA,
             owner: this.wallet.publicKey,
             multisig: multisigPDA,
             payer: this.wallet.publicKey,
-            tokenProgram: splToken.TOKEN_2022_PROGRAM_ID,
+            tokenProgram:  TOKEN_2022_PROGRAM_ID,
           })
           .remainingAccounts([
             { pubkey: wallet1.publicKey, isWritable: false, isSigner: true },
@@ -435,10 +495,6 @@ async function main() {
   console.log(`[METADATA] Token Name: ${result.metadata.name}`);
   console.log(`[METADATA] Token Symbol: ${result.metadata.symbol}`);
   console.log(`[INFO] New Multisig: ${result.isNewMultisig}`);
-  console.log("\n[WALLETS] Playground Wallet Signers:");
-  console.log(`Wallet 1: ${result.playgroundWallets.wallet1}`);
-  console.log(`Wallet 2: ${result.playgroundWallets.wallet2}`);
-  console.log(`Wallet 3: ${result.playgroundWallets.wallet3}`);
 }
 
 main().catch(console.error);
