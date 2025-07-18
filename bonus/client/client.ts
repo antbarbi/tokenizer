@@ -212,42 +212,22 @@ class RealMultisigClient {
         console.log(`[TX] Mint creation tx: ${createMintTx}`);
         // --- Robust metadata pointer/metadata initialization ---
         if (createMintTx !== "EXISTING_MINT") {
-          console.log("[METADATA] Initializing Token Extensions metadata...");
-          const metadataPointerIx = createInitializeMetadataPointerInstruction(
-            mintPDA,
-            this.wallet.publicKey, // update authority
-            mintPDA,               // metadata address (can be the mint itself)
-            TOKEN_2022_PROGRAM_ID
-          );
-          const metadataIx = createInitializeInstruction({
-            programId: TOKEN_2022_PROGRAM_ID,
-            metadata: mintPDA,
-            updateAuthority: this.wallet.publicKey,
-            mint: mintPDA,
-            mintAuthority: this.wallet.publicKey,
-            name: metadata.name,
-            symbol: metadata.symbol,
-            uri: metadata.uri,
-          });
-          const tx = new Transaction().add(metadataPointerIx, metadataIx);
-          try {
-            const sig = await this.connection.sendTransaction(tx, [this.wallet.payer]);
-            console.log("[METADATA] Metadata initialized!");
-            console.log(`[TX] Metadata init tx: ${sig}`);
-          } catch (error) {
-            if (
-              error.message &&
-              (error.message.includes("custom program error: 0x6") ||
-                error.message.includes("account or token already in use"))
-            ) {
-              console.log("[WARN] Metadata pointer already initialized, skipping.");
-            } else {
-              throw error;
-            }
-          }
+          console.log("[METADATA] Initializing Token Extensions metadata via Anchor program...");
+          await this.program.methods
+            .initializeMetadataPointerAndMetadata(
+              metadata.name,
+              metadata.symbol,
+              metadata.uri
+            )
+            .accounts({
+              mint: mintPDA,
+              multisig: multisigPDA,
+              payer: this.wallet.publicKey,
+              tokenProgram: TOKEN_2022_PROGRAM_ID,
+            })
+            .rpc();
+          console.log("[METADATA] Metadata pointer and metadata extension initialized!");
         }
-        console.log("[INFO] Metadata support ready for Token Extensions");
-      }
 
       // Create Associated Token Account using robust SPL Token logic
       const tokenAccountATA = getAssociatedTokenAddressSync(
