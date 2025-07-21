@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::associated_token::AssociatedToken;
 
 // Program unique address in solana blockchain is set automtically by SolPlayground 
 declare_id!("8habFRuakcsNxRugQiTs77jxfug2mTSaWY6WJTooiuGt");
@@ -35,7 +36,6 @@ mod token_program {
     }
 
     pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
-        // Create the transfer CPI instruction
         let cpi_accounts = token::Transfer {
             from: ctx.accounts.source.to_account_info(),
             to: ctx.accounts.destination.to_account_info(),
@@ -45,7 +45,6 @@ mod token_program {
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         
-        // Execute transfer
         token::transfer(cpi_ctx, amount)?;
         
         msg!("Transferred {} tokens from {} to {}", 
@@ -57,11 +56,6 @@ mod token_program {
         Ok(())
     }
 }
-
-// Each instruction needs to explicitly declare:
-// 1. WHICH accounts it will use
-// 2. HOW it will use them (read/write/create)
-// 3. WHAT validation rules apply
 
 #[derive(Accounts)]
 pub struct CreateMint<'info> {
@@ -87,10 +81,8 @@ pub struct CreateTokenAccount<'info> {
     #[account(
         init,
         payer = owner,
-        token::mint = mint,
-        token::authority = owner,
-        seeds = [b"token_account", owner.key().as_ref(), mint.key().as_ref()],
-        bump
+        associated_token::mint = mint,
+        associated_token::authority = owner,
     )]
     pub token_account: Account<'info, TokenAccount>,
     
@@ -100,7 +92,7 @@ pub struct CreateTokenAccount<'info> {
     pub owner: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub rent: Sysvar<'info, Rent>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 #[derive(Accounts)]

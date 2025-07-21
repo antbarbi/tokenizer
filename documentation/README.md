@@ -3,6 +3,10 @@
 <img src="icon_42nug.png" alt="icon" width="200">
 
 ## Overview
+###
+
+- [Mandatory project in-depth explanation](.code.md)
+- [Bonus project in-depth explanation](.code.md)
 
 ### Web3.0
 

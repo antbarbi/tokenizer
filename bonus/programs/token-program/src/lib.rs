@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::token_interface::{Mint, TokenInterface, TokenAccount};
+use anchor_spl::associated_token::AssociatedToken;
 
 declare_id!("8habFRuakcsNxRugQiTs77jxfug2mTSaWY6WJTooiuGt");
 
@@ -14,30 +15,37 @@ mod token_program {
         threshold: u8
     ) -> Result<()> {
         require!(threshold > 0 && threshold <= signers.len() as u8, CustomError::InvalidThreshold);
-        require!(signers.len() <= 10, CustomError::TooManySigners); // Max 10 signers
+        require!(signers.len() <= 10, CustomError::TooManySigners);
         
         let multisig = &mut ctx.accounts.multisig;
         multisig.signers = signers.clone();
         multisig.threshold = threshold;
         multisig.nonce = 0;
-        multisig.bump = ctx.bumps.multisig; // Fixed: Use direct field access (no .get())
+        multisig.bump = ctx.bumps.multisig;
         
         msg!("Multisig created with {} signers, threshold: {}", signers.len(), threshold);
         Ok(())
     }
     
-    // Create mint with multisig authority
-    pub fn create_multisig_mint(ctx: Context<CreateMultisigMint>, decimals: u8) -> Result<()> {
-        msg!("Mint created with multisig authority: {}", ctx.accounts.multisig.key());
+    // Create mint with multisig authority (TOKEN EXTENSIONS COMPATIBLE)
+    pub fn create_multisig_mint(
+        ctx: Context<CreateMultisigMint>, 
+        decimals: u8
+    ) -> Result<()> {
+        // The mint is already created by Anchor with Token Extensions support
+        // Metadata will be added separately via client-side instructions
+        msg!("Token Extensions mint created with decimals: {}, Authority: {}", 
+             decimals, ctx.accounts.multisig.key());
         Ok(())
     }
 
-    pub fn create_token_account(ctx: Context<CreateTokenAccount>) -> Result<()> {
-        msg!("Token account created: {}", ctx.accounts.token_account.key());
+    // Create ATA instead of custom PDA
+    pub fn create_associated_token_account(ctx: Context<CreateAssociatedTokenAccount>) -> Result<()> {
+        msg!("Associated Token Account created: {}", ctx.accounts.associated_token_account.key());
         Ok(())
     }
     
-    // Multisig mint tokens - requires multiple signatures
+    // Multisig mint tokens - TOKEN EXTENSIONS VERSION
     pub fn multisig_mint_tokens(ctx: Context<MultisigMintTokens>, amount: u64) -> Result<()> {
         let multisig = &mut ctx.accounts.multisig;
         
@@ -60,28 +68,70 @@ mod token_program {
         // Increment nonce to prevent replay attacks
         multisig.nonce += 1;
         
-        // Create CPI to mint tokens using multisig as authority
-        // Fixed: Create binding to avoid temporary value issue
+        // Create CPI to mint tokens using Token Extensions
         let payer_key = ctx.accounts.payer.key();
         let seeds = &[
             b"multisig",
-            payer_key.as_ref(), // Fixed: Use binding instead of temporary value
+            payer_key.as_ref(),
             &[multisig.bump]
         ];
         let signer_seeds = &[&seeds[..]];
         
-        let cpi_accounts = token::MintTo {
+        // Use anchor_spl::token_interface for Token Extensions
+        let cpi_accounts = anchor_spl::token_interface::MintTo {
             mint: ctx.accounts.mint.to_account_info(),
-            to: ctx.accounts.token_account.to_account_info(),
+            to: ctx.accounts.associated_token_account.to_account_info(),
             authority: ctx.accounts.multisig.to_account_info(),
         };
         
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
         
-        token::mint_to(cpi_ctx, amount)?;
+        anchor_spl::token_interface::mint_to(cpi_ctx, amount)?;
         
         msg!("Multisig minted {} tokens with {} signatures", amount, valid_signatures);
+        Ok(())
+    }
+    
+    // Transfer tokens using multisig (TOKEN EXTENSIONS VERSION)
+    pub fn multisig_transfer(
+        ctx: Context<MultisigTransfer>, 
+        amount: u64
+    ) -> Result<()> {
+        let multisig = &mut ctx.accounts.multisig;
+        
+        // Verify signatures (same logic as mint)
+        let valid_signatures = ctx.remaining_accounts.len();
+        require!(
+            valid_signatures >= multisig.threshold as usize, 
+            CustomError::NotEnoughSignatures
+        );
+        
+        for signer_info in ctx.remaining_accounts.iter() {
+            require!(signer_info.is_signer, CustomError::SignerMustSign);
+            require!(
+                multisig.signers.contains(signer_info.key), 
+                CustomError::UnauthorizedSigner
+            );
+        }
+        
+        multisig.nonce += 1;
+        
+        // Use Token Extensions for transfer with transfer_checked (recommended)
+        let cpi_accounts = anchor_spl::token_interface::TransferChecked {
+            from: ctx.accounts.from_ata.to_account_info(),
+            mint: ctx.accounts.mint.to_account_info(),
+            to: ctx.accounts.to_ata.to_account_info(),
+            authority: ctx.accounts.from_authority.to_account_info(),
+        };
+        
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        
+        // Use transfer_checked instead of deprecated transfer
+        anchor_spl::token_interface::transfer_checked(cpi_ctx, amount, ctx.accounts.mint.decimals)?;
+        
+        msg!("Multisig transferred {} tokens", amount);
         Ok(())
     }
 }
@@ -89,10 +139,10 @@ mod token_program {
 // Multisig account structure
 #[account]
 pub struct Multisig {
-    pub signers: Vec<Pubkey>,    // Authorized signers
-    pub threshold: u8,           // Required number of signatures
-    pub nonce: u64,             // Prevents replay attacks
-    pub bump: u8,               // PDA bump
+    pub signers: Vec<Pubkey>,
+    pub threshold: u8,
+    pub nonce: u64,
+    pub bump: u8,
 }
 
 // Create multisig account
@@ -101,7 +151,7 @@ pub struct CreateMultisig<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + 4 + 32 * 10 + 1 + 8 + 1, // 8 (discriminator) + 4 (Vec length) + 32*10 (max signers) + 1 (threshold) + 8 (nonce) + 1 (bump)
+        space = 8 + 4 + 32 * 10 + 1 + 8 + 1, // Account discriminator + Vec<Pubkey> + threshold + nonce + bump
         seeds = [b"multisig", payer.key().as_ref()],
         bump
     )]
@@ -112,7 +162,7 @@ pub struct CreateMultisig<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// Create mint with multisig authority
+// Create mint with Token Extensions support (simplified)
 #[derive(Accounts)]
 pub struct CreateMultisigMint<'info> {
     #[account(
@@ -120,64 +170,108 @@ pub struct CreateMultisigMint<'info> {
         payer = payer,
         mint::decimals = 9,
         mint::authority = multisig,
+        mint::token_program = token_program,
+        mint::freeze_authority = multisig,
         seeds = [b"mint", multisig.key().as_ref()],
         bump
     )]
-    pub mint: Account<'info, Mint>,
+    pub mint: InterfaceAccount<'info, Mint>,
     
     pub multisig: Account<'info, Multisig>,
     
     #[account(mut)]
     pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
     pub rent: Sysvar<'info, Rent>,
 }
 
-// Multisig mint tokens
+// Create Associated Token Account
+#[derive(Accounts)]
+pub struct CreateAssociatedTokenAccount<'info> {
+    #[account(
+        init,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = owner,
+        associated_token::token_program = token_program,
+    )]
+    pub associated_token_account: InterfaceAccount<'info, TokenAccount>,
+    
+    pub mint: InterfaceAccount<'info, Mint>,
+    
+    /// CHECK: This is the owner of the ATA
+    pub owner: AccountInfo<'info>,
+    
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+// Multisig mint tokens with ATA
 #[derive(Accounts)]
 pub struct MultisigMintTokens<'info> {
     #[account(
         mut,
         mint::authority = multisig,
+        mint::token_program = token_program,
     )]
-    pub mint: Account<'info, Mint>,
+    pub mint: InterfaceAccount<'info, Mint>,
     
     #[account(
         mut,
-        token::mint = mint,
+        associated_token::mint = mint,
+        associated_token::authority = owner,
+        associated_token::token_program = token_program,
     )]
-    pub token_account: Account<'info, TokenAccount>,
+    pub associated_token_account: InterfaceAccount<'info, TokenAccount>,
+    
+    /// CHECK: Owner of the ATA
+    pub owner: AccountInfo<'info>,
     
     #[account(mut)]
     pub multisig: Account<'info, Multisig>,
     
-    // Add payer to access in PDA seeds
     pub payer: Signer<'info>,
-    
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
     // remaining_accounts will contain the signers
 }
 
+// Transfer between ATAs - FULLY FIXED VERSION
 #[derive(Accounts)]
-pub struct CreateTokenAccount<'info> {
+pub struct MultisigTransfer<'info> {
     #[account(
-        init,
-        payer = owner,
-        token::mint = mint,
-        token::authority = owner,
-        seeds = [b"token_account", owner.key().as_ref(), mint.key().as_ref()],
-        bump
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = from_authority,
+        associated_token::token_program = token_program,
     )]
-    pub token_account: Account<'info, TokenAccount>,
+    pub from_ata: InterfaceAccount<'info, TokenAccount>,
     
-    pub mint: Account<'info, Mint>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = to_authority,  // ✅ FIXED: Added missing authority
+        associated_token::token_program = token_program,
+    )]
+    pub to_ata: InterfaceAccount<'info, TokenAccount>,
+    
+    pub mint: InterfaceAccount<'info, Mint>,
+    
+    /// CHECK: Authority for the from_ata
+    pub from_authority: AccountInfo<'info>,
+    
+    /// CHECK: Authority for the to_ata  
+    pub to_authority: AccountInfo<'info>,
     
     #[account(mut)]
-    pub owner: Signer<'info>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
-    pub rent: Sysvar<'info, Rent>,
+    pub multisig: Account<'info, Multisig>,
+    
+    pub token_program: Interface<'info, TokenInterface>,
+    // remaining_accounts will contain the signers
 }
 
 // Custom errors

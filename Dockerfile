@@ -28,21 +28,24 @@ ENV PATH="/root/.cargo/bin:$PATH"
 # Verify Rust installation
 RUN rustc --version
 
-# Rest of your existing Dockerfile...
-ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
-
 # Install Solana CLI
+ENV PATH="/root/.local/share/solana/install/active_release/bin:$PATH"
 RUN curl -sSfL https://release.anza.xyz/stable/install | sh \
     && echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> ~/.zshrc
 
-# Create a directory for Solana program binaries
-RUN mkdir -p /root/program-bins
+# # Install Node.js (for development)
+# RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+#     && apt-get install -y nodejs
 
-# Download Metaplex Token Metadata program
-RUN curl -L https://github.com/metaplex-foundation/metaplex-program-library/releases/download/v1.11.1/mpl_token_metadata.so -o /root/program-bins/mpl_token_metadata.so
+# # Install Anchor CLI
+# RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force \
+#     && avm install latest \
+#     && avm use latest
 
-RUN solana-keygen new  --no-bip39-passphrase
+# Generate keypair
+RUN solana-keygen new --no-bip39-passphrase
 
+# Configure Solana
 RUN solana config set --url localhost --keypair /root/.config/solana/id.json
 
 COPY ./entrypoint.sh /entrypoint.sh
