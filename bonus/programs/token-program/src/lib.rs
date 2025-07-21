@@ -39,13 +39,13 @@ mod token_program {
         Ok(())
     }
 
-    // Create ATA instead of custom PDA
+    // Create ATA
     pub fn create_associated_token_account(ctx: Context<CreateAssociatedTokenAccount>) -> Result<()> {
         msg!("Associated Token Account created: {}", ctx.accounts.associated_token_account.key());
         Ok(())
     }
     
-    // Multisig mint tokens - TOKEN EXTENSIONS VERSION
+    // Multisig mint tokens
     pub fn multisig_mint_tokens(ctx: Context<MultisigMintTokens>, amount: u64) -> Result<()> {
         let multisig = &mut ctx.accounts.multisig;
         
@@ -93,7 +93,7 @@ mod token_program {
         Ok(())
     }
     
-    // Transfer tokens using multisig (TOKEN EXTENSIONS VERSION)
+    // Transfer tokens using multisig
     pub fn multisig_transfer(
         ctx: Context<MultisigTransfer>, 
         amount: u64
@@ -117,7 +117,6 @@ mod token_program {
         
         multisig.nonce += 1;
         
-        // Use Token Extensions for transfer with transfer_checked (recommended)
         let cpi_accounts = anchor_spl::token_interface::TransferChecked {
             from: ctx.accounts.from_ata.to_account_info(),
             mint: ctx.accounts.mint.to_account_info(),
@@ -240,7 +239,7 @@ pub struct MultisigMintTokens<'info> {
     // remaining_accounts will contain the signers
 }
 
-// Transfer between ATAs - FULLY FIXED VERSION
+// Transfer between ATAs
 #[derive(Accounts)]
 pub struct MultisigTransfer<'info> {
     #[account(
@@ -254,7 +253,7 @@ pub struct MultisigTransfer<'info> {
     #[account(
         mut,
         associated_token::mint = mint,
-        associated_token::authority = to_authority,  // ✅ FIXED: Added missing authority
+        associated_token::authority = to_authority,
         associated_token::token_program = token_program,
     )]
     pub to_ata: InterfaceAccount<'info, TokenAccount>,

@@ -210,13 +210,13 @@ class RealMultisigClient {
 
         console.log("[SUCCESS] Token Extensions mint created!");
         console.log(`[TX] Mint creation tx: ${createMintTx}`);
-        // --- Robust metadata pointer/metadata initialization ---
+
         if (createMintTx !== "EXISTING_MINT") {
           console.log("[METADATA] Initializing Token Extensions metadata...");
           const metadataPointerIx = createInitializeMetadataPointerInstruction(
             mintPDA,
             this.wallet.publicKey, // update authority
-            mintPDA,               // metadata address (can be the mint itself)
+            mintPDA,               // metadata address
             TOKEN_2022_PROGRAM_ID
           );
           const metadataIx = createInitializeInstruction({
@@ -347,7 +347,7 @@ class RealMultisigClient {
 
     try {
       // SUCCESSFUL CASE: 2-of-3 signatures
-      console.log("\n🟢 TESTING: Successful mint with 2 signatures (meets threshold)...");
+      console.log("\nTESTING: Successful mint with 2 signatures (meets threshold)...");
       const mintTxSig = await this.program.methods
         .multisigMintTokens(new anchor.BN(mintAmount))
         .accounts({
@@ -373,7 +373,7 @@ class RealMultisigClient {
       console.log(`[SUCCESS] Token balance: ${tokenAccountInfo.value.uiAmount} tokens`);
 
       // FAILURE CASE: Test insufficient signatures
-      console.log("\n🔴 TESTING: Mint with insufficient signatures (1 signature, below threshold of 2)...");
+      console.log("\nTESTING: Mint with insufficient signatures (1 signature, below threshold of 2)...");
       
       try {
         await this.program.methods
@@ -392,14 +392,14 @@ class RealMultisigClient {
           .signers([wallet1])
           .rpc();
           
-        console.log("❌ [ERROR] This transaction should have failed but didn't!");
+        console.log("[ERROR] This transaction should have failed but didn't!");
       } catch (error) {
-        console.log("✅ [SUCCESS] Correctly rejected insufficient signatures!");
+        console.log("[SUCCESS] Correctly rejected insufficient signatures!");
         console.log(`[INFO] Error message: ${error.message}`);
       }
 
       // FAILURE CASE: Test with no signatures
-      console.log("\n🔴 TESTING: Mint with no signatures...");
+      console.log("\nTESTING: Mint with no signatures...");
       
       try {
         await this.program.methods
@@ -416,14 +416,14 @@ class RealMultisigClient {
           .signers([])
           .rpc();
           
-        console.log("❌ [ERROR] This transaction should have failed but didn't!");
+        console.log("[ERROR] This transaction should have failed but didn't!");
       } catch (error) {
-        console.log("✅ [SUCCESS] Correctly rejected transaction with no signatures!");
+        console.log("[SUCCESS] Correctly rejected transaction with no signatures!");
         console.log(`[INFO] Error message: ${error.message}`);
       }
 
       // SUCCESS CASE: Test with all 3 signatures
-      console.log("\n🟢 TESTING: Mint with all 3 signatures (exceeds threshold)...");
+      console.log("\nTESTING: Mint with all 3 signatures (exceeds threshold)...");
       
       try {
         const allSignersTx = await this.program.methods
@@ -444,21 +444,21 @@ class RealMultisigClient {
           .signers([wallet1, wallet2, wallet3])
           .rpc();
           
-        console.log("✅ [SUCCESS] All 3 signatures accepted!");
+        console.log("[SUCCESS] All 3 signatures accepted!");
         console.log(`[TX] All signers tx: ${allSignersTx}`);
       } catch (error) {
-        console.log("⚠️ [WARN] All signatures test failed:", error.message);
+        console.log("[WARN] All signatures test failed:", error.message);
       }
 
       // Final balance check
       const finalTokenAccountInfo = await this.connection.getTokenAccountBalance(tokenAccountATA);
       console.log(`\n[FINAL] Total token balance: ${finalTokenAccountInfo.value.uiAmount} tokens`);
 
-      console.log("\n📊 MULTISIG TESTING SUMMARY:");
-      console.log("✅ 2-of-3 signatures: PASSED (meets threshold)");
-      console.log("✅ 1-of-3 signatures: CORRECTLY REJECTED");
-      console.log("✅ 0-of-3 signatures: CORRECTLY REJECTED");
-      console.log("✅ 3-of-3 signatures: PASSED (exceeds threshold)");
+      console.log("\nMULTISIG TESTING SUMMARY:");
+      console.log("2-of-3 signatures: PASSED (meets threshold)");
+      console.log("1-of-3 signatures: CORRECTLY REJECTED");
+      console.log("0-of-3 signatures: CORRECTLY REJECTED");
+      console.log("3-of-3 signatures: PASSED (exceeds threshold)");
 
       return [mintTxSig];
     } catch (error) {

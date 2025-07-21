@@ -56,7 +56,7 @@ async function main() {
     // 1. CREATE TOKEN WITH METADATA USING TOKEN EXTENSIONS
     console.log("Creating token with metadata using Token Extensions...");
     
-    // 🎯 FIXED MINT FOR CONSISTENT TESTING 🎯
+    // FIXED MINT FOR CONSISTENT TESTING
     // This will generate the SAME mint every time you run the code
     const mintSeed = new Uint8Array(32);
     mintSeed.fill(42); // Fill with consistent value (42)
@@ -66,10 +66,10 @@ async function main() {
     console.log("Fixed Mint Address:", mint.toString());
     console.log("This mint will be the SAME every time you run the code!");
     
-    // 🎯 CUSTOMIZE YOUR TOKEN NAME AND SYMBOL HERE 🎯
+    // CUSTOMIZE YOUR TOKEN NAME AND SYMBOL HERE
     const metadata = {
       name: "42Nug",          // ← Change this to your desired name
-      symbol: "42N",                    // ← Change this to your desired symbol
+      symbol: "42N",         // ← Change this to your desired symbol
       uri: "https://gateway.pinata.cloud/ipfs/bafkreibarehgrziov4e5smqkah4cxw3jyod7lxnpy5dvhaqq6cqow3m3um", // ← Optional: add your metadata JSON URL
     };
     
@@ -77,10 +77,10 @@ async function main() {
     const existingMintAccount = await provider.connection.getAccountInfo(mint);
     
     if (existingMintAccount) {
-      console.log("⚠️  Mint already exists! Skipping mint creation...");
+      console.log("Mint already exists! Skipping mint creation...");
       console.log("Using existing mint for token operations");
     } else {
-      console.log("✅ Mint doesn't exist yet, creating new one...");
+      console.log("Mint doesn't exist yet, creating new one...");
       
       // Calculate space needed - use only the metadata pointer extension
       const extensions = [ExtensionType.MetadataPointer];
@@ -126,7 +126,7 @@ async function main() {
       );
       
       const mintSignature = await provider.sendAndConfirm(mintTransaction, [mintKeypair]);
-      console.log("✅ Token with metadata pointer created!");
+      console.log("Token with metadata pointer created!");
       console.log("Mint transaction signature:", mintSignature);
       
       // 2. EXTEND ACCOUNT AND INITIALIZE METADATA
@@ -169,10 +169,10 @@ async function main() {
           });
           
           await provider.sendAndConfirm(new Transaction().add(transferInstruction));
-          console.log("✅ Additional rent transferred to mint account");
+      console.log("Additional rent transferred to mint account");
         }
 
-        // Now try to initialize metadata directly
+        // initialize metadata directly
         const initializeMetadataInstruction = createInitializeInstruction({
           programId: TOKEN_2022_PROGRAM_ID,
           metadata: mint,
@@ -187,13 +187,13 @@ async function main() {
         const metadataTransaction = new Transaction().add(initializeMetadataInstruction);
         const metadataSignature = await provider.sendAndConfirm(metadataTransaction);
         
-        console.log("✅ Token metadata initialized successfully!");
-        console.log("🎉 Your token name:", metadata.name);
-        console.log("🎉 Your token symbol:", metadata.symbol);
+        console.log("Token metadata initialized successfully!");
+        console.log("Your token name:", metadata.name);
+        console.log("Your token symbol:", metadata.symbol);
         console.log("Metadata transaction signature:", metadataSignature);
         
       } catch (metadataError) {
-        console.log("⚠️ Full metadata failed, trying minimal approach...");
+        console.log("Full metadata failed, trying minimal approach...");
         console.log("Error:", metadataError.message);
         
         // Try with just the symbol as both name and symbol (minimal space)
@@ -212,12 +212,12 @@ async function main() {
           
           const minimalTransaction = new Transaction().add(minimalMetadataInstruction);
           const minimalSignature = await provider.sendAndConfirm(minimalTransaction);
-          console.log("✅ Minimal metadata created successfully!");
-          console.log("🎉 Your token name/symbol:", metadata.symbol);
+          console.log("Minimal metadata created successfully!");
+          console.log("Your token name/symbol:", metadata.symbol);
           console.log("Minimal metadata signature:", minimalSignature);
           
         } catch (minimalError) {
-          console.log("❌ All metadata attempts failed!");
+          console.log("All metadata attempts failed!");
           console.log("Token is fully functional but without custom name");
           console.log("Error:", minimalError.message);
         }
@@ -225,7 +225,6 @@ async function main() {
     }
     
     // 3. DERIVE ATA ADDRESSES (using TOKEN_2022_PROGRAM_ID)
-    // These will now be CONSISTENT every time because mint is fixed!
     const tokenAccount1ATA = getAssociatedTokenAddressSync(
       mint,
       wallet.publicKey,
@@ -259,9 +258,9 @@ async function main() {
         TOKEN_2022_PROGRAM_ID
       );
       await provider.sendAndConfirm(new Transaction().add(createATA1Instruction));
-      console.log("✅ First token account created");
+      console.log("First token account created");
     } else {
-      console.log("✅ First token account already exists");
+      console.log("First token account already exists");
     }
     
     // Fund second wallet if needed
@@ -275,9 +274,9 @@ async function main() {
         })
       );
       await provider.sendAndConfirm(transferSolTx);
-      console.log("✅ Funded second wallet with SOL");
+      console.log("Funded second wallet with SOL");
     } else {
-      console.log("✅ Second wallet already has sufficient SOL");
+      console.log("Second wallet already has sufficient SOL");
     }
     
     if (!account2Exists) {
@@ -290,9 +289,9 @@ async function main() {
         TOKEN_2022_PROGRAM_ID
       );
       await provider.sendAndConfirm(new Transaction().add(createATA2Instruction), [secondWallet]);
-      console.log("✅ Second token account created");
+      console.log("Second token account created");
     } else {
-      console.log("✅ Second token account already exists");
+      console.log("Second token account already exists");
     }
 
     // 5. MINT TOKENS (only if account is empty)
@@ -315,9 +314,9 @@ async function main() {
       );
       
       await provider.sendAndConfirm(new Transaction().add(mintToInstruction));
-      console.log("✅ Tokens minted to first account");
+      console.log("Tokens minted to first account");
     } else {
-      console.log("✅ First account already has tokens");
+      console.log("First account already has tokens");
     }
 
     // 6. CHECK BALANCES
@@ -330,7 +329,7 @@ async function main() {
 
     // 7. ALWAYS TRANSFER TOKENS TO SHOWCASE FUNCTIONALITY
     const transferAmount = 100000000n; // 0.1 tokens for demonstration
-    console.log("\n🚀 SHOWCASING TRANSFER CAPABILITY:");
+    console.log("\nSHOWCASING TRANSFER CAPABILITY:");
     console.log(`Transferring ${Number(transferAmount) / Math.pow(10, 9)} tokens from Account 1 to Account 2...`);
 
     // Check if first account has enough tokens to transfer
@@ -345,10 +344,10 @@ async function main() {
       );
       
       await provider.sendAndConfirm(new Transaction().add(transferInstruction));
-      console.log("✅ Transfer completed successfully!");
-      console.log(`📤 Sent: ${Number(transferAmount) / Math.pow(10, 9)} tokens`);
+      console.log("Transfer completed successfully!");
+      console.log(`Sent: ${Number(transferAmount) / Math.pow(10, 9)} tokens`);
     } else {
-      console.log("⚠️ Insufficient tokens in Account 1 for transfer");
+      console.log("Insufficient tokens in Account 1 for transfer");
       console.log(`Available: ${Number(tokenAccount1.amount) / Math.pow(10, 9)} tokens`);
       console.log(`Needed: ${Number(transferAmount) / Math.pow(10, 9)} tokens`);
     }
@@ -361,11 +360,11 @@ async function main() {
     console.log("Account 1:", Number(tokenAccount1.amount) / Math.pow(10, 9), "tokens");
     console.log("Account 2:", Number(tokenAccount2.amount) / Math.pow(10, 9), "tokens");
     
-    console.log("\n✅ Token Extensions program completed successfully!");
-    console.log("🔗 Your FIXED token mint address:", mint.toString());
-    console.log(`🎯 Your token "${metadata.name}" (${metadata.symbol}) is ready!`);
-    console.log("🚀 Token has native metadata support and is production-ready!");
-    console.log("\n📌 CONSISTENT ADDRESSES:");
+    console.log("\nToken Extensions program completed successfully!");
+    console.log("Your FIXED token mint address:", mint.toString());
+    console.log(`Your token \"${metadata.name}\" (${metadata.symbol}) is ready!`);
+    console.log("Token has native metadata support and is production-ready!");
+    console.log("\nCONSISTENT ADDRESSES:");
     console.log("   Mint:", mint.toString());
     console.log("   Token Account 1:", tokenAccount1ATA.toString());
     console.log("   Token Account 2:", tokenAccount2ATA.toString());
