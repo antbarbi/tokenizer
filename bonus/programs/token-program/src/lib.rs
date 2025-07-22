@@ -27,7 +27,7 @@ mod token_program {
         Ok(())
     }
     
-    // Create mint with multisig authority (TOKEN EXTENSIONS COMPATIBLE)
+    // Create mint with multisig authority
     pub fn create_multisig_mint(
         ctx: Context<CreateMultisigMint>, 
         decimals: u8

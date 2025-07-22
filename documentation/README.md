@@ -177,3 +177,37 @@ tokenizer/
 The 42nug token project demonstrates a complete implementation of a Solana-based token with advanced features like multi-signature support. It serves as both a functional token system and an educational resource for understanding modern blockchain development practices, particularly within the Solana ecosystem.
 
 The project showcases the power of Solana's high-performance blockchain, the security of Rust programming, and the flexibility of the SPL Token standard, making it an excellent foundation for understanding and building upon decentralized token systems.
+
+## Multisig Implementation Details
+
+The bonus implementation features a custom multisig system for secure token minting and transfers. Here’s how it works:
+
+### How Multisig Works
+
+- **Custom Multisig Account:**
+  - A dedicated on-chain account stores the list of allowed signers and the required signature threshold (e.g., 2-of-3).
+  - The multisig account is created with a deterministic PDA (Program Derived Address) using the payer’s public key and a static seed.
+
+- **Threshold-Based Approval:**
+  - For critical operations (minting, transferring), the program checks that the number of provided signers meets or exceeds the threshold.
+  - Each signer must be present in the stored list of allowed signers.
+
+- **Signature Validation:**
+  - The program verifies that each provided signer is a real signer of the transaction and is authorized.
+  - If any signer is missing or unauthorized, the transaction fails.
+
+- **Authority Enforcement:**
+  - The multisig PDA is set as the authority for the mint and token accounts, so only the program (with the correct signers) can approve minting or transfers.
+
+### How This Differs from SPL Multisig
+
+- **SPL Multisig** (built into the SPL Token program) only supports multisig for token accounts (not mint authorities or metadata extensions).
+- **This custom multisig** allows for multisig control over minting and transferring tokens, with flexible threshold and signer management, and is enforced at the program level.
+
+### Usage Example
+
+- To mint tokens, a transaction must include the required number of signers from the multisig account.
+- The program checks all signatures and only mints if the threshold is met.
+- The same logic applies to token transfers controlled by the multisig.
+
+This approach provides robust, on-chain governance for token operations, making it suitable for DAOs, treasuries, and any scenario requiring shared control over assets.
